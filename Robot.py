@@ -20,6 +20,7 @@ class Robot(Object):
     def __init__(self,parent=None):
         super(Robot, self).__init__()
         #print("myId: "+str(self.id))
+
         self.setPosition(500,500)
         self.forward = np.array([1.,0.])
         self.vl = 0#np.array([0.,0.])
@@ -68,20 +69,30 @@ class Robot(Object):
             self.pos = np.array([retMatrix[0],retMatrix[1]])
             self.theta = retMatrix[2]
 
-            aVec = self.ICC - self.pos
-            self.forward = np.array([-aVec[1],aVec[0]])
+            self.forward = np.array(
+                [np.cos(self.theta)*xAxes[0] - np.sin(self.theta)*xAxes[1],
+                    np.sin(self.theta) * xAxes[0] + np.cos(self.theta) * xAxes[1],
+                ])
+            #aVec = self.ICC - self.pos
+            #aVec= np.linalg.norm(aVec,ord=1,keepdims=True)
+            #self.forward = np.array([aVec[1],-aVec[0]])
+            temp = np.arccos(np.dot(self.forward, xAxes) / (
+                    np.linalg.norm(self.forward) * np.linalg.norm(xAxes)))  # self.angle(self.forward,np.array([1,0]))
 
-            print("forward= "+str(self.forward))
+            print("forward= " + str(self.forward) + "|f = " + str(Utils.normalize(self.forward))+"|temp="+str(temp)+"|theta="+str(self.theta))
             #self.pos = self.pos + self.forward
 
         elif self.vr == -self.vl and self.vr !=0:
             self.forward = np.zeros((1,2))
             self.rotation = 2 /self.l * self.vr
-        else:
-            self.pos = self.pos + self.forward
-
+        elif self.vr !=0 :
+            self.ICC = self.pos
+            f = Utils.normalize(self.forward)
+            print("forward= " + str(self.forward) + "|f = " + str(f))
+            self.pos = self.pos + f#self.forward
         return True
 
+    '''
     def updatePosition(self,dt):
         delta = self.vr - self.vl#np.linalg.norm( self.vr - self.vl)
 
@@ -133,7 +144,7 @@ class Robot(Object):
         newPos = np.array([ret[0],ret[1]])
         theta = ret[2]
         return newPos,theta
-
+    '''
 
     def setDistanceBetweenWheelAndOrigin(self,value):
         if(value >0 and value < self.radius):
@@ -142,19 +153,20 @@ class Robot(Object):
 
     def draw(self,qp):
         #body
+        origin = np.array([self.pos[0] - self.size/2,self.pos[1] - self.size/2])
         pen = QPen(Qt.red, 1.5, Qt.SolidLine)
         qp.setPen(pen)
-        qp.drawEllipse(self.pos[0], self.pos[1], self.size, self.size)
+        qp.drawEllipse(origin[0], origin[1], self.size, self.size)
         #forward
-        origin = self.pos + self.size/2
         pen2 = QPen(Qt.red, 0.5, Qt.SolidLine)
         qp.setPen(pen2)
-        qp.drawLine(origin[0], origin[1], origin[0]+self.forward[0]*50, origin[1]+self.forward[1]*50)
+        f = self.forward #Utils.normalize(self.forward)
+        qp.drawLine(self.pos[0], self.pos[1], self.pos[0]+f[0]*self.size/2, self.pos[1]+f[1]*self.size/2)
 
         #ICC debug
         pen3 = QPen(Qt.blue, 1.5, Qt.SolidLine)
         qp.setPen(pen3)
-        qp.drawEllipse(self.ICC[0], self.ICC[1], self.size/3, self.size/3)
+        qp.drawEllipse(self.ICC[0], self.ICC[1], self.size/4, self.size/4)
 
 
         #left wheel - todo come back later

@@ -37,7 +37,6 @@ class MRS(QMainWindow):#(QWidget):#
         verticalLayout = QVBoxLayout(self)
         verticalLayout.addLayout(horizontalLayout)
         #verticalLayout.addWidget(self.robot)
-
         self.setLayout(verticalLayout)
         self.resize(1080, 720)
         #self.center()
@@ -62,15 +61,16 @@ class MRS(QMainWindow):#(QWidget):#
         if key == Qt.Key_O:
             print("pressO")
             self.doPress = True
-            self.robot.vr += -5  # self.robot.forward * 5
+            self.robot.vr += 5  # self.robot.forward * 5
         elif key == Qt.Key_L:
             print("pressL")
             self.doPress = True
-            self.robot.vr += 5  # self.robot.forward * -5#
+            self.robot.vr +=  -5  # self.robot.forward * -5#
 
         if key == Qt.Key_C:
             self.robot.setPosition(500,500)
             self.robot.forward = np.array([1.,0.])
+            self.robot.rotation =0
             return None
 
         if self.doPress:
