@@ -45,10 +45,10 @@ class Robot(Object):
             xAxes =np.array([1,0])
             self.rotation = delta / self.l
             self.R = self.l/2 * (self.vr + self.vl)/delta
-            temp1 = self.vl * xAxes#self.forward
-            temp2 = self.vr * xAxes#self.forward
+            #temp1 = self.vl * xAxes#self.forward
+            #temp2 = self.vr * xAxes#self.forward
 
-            self.forward = (temp1 + temp2)/2
+            #self.forward = (temp1 + temp2)/2
 
             self.ICC = np.array([self.pos[0]- self.R * np.sin(self.theta),
                                  self.pos[1]+ self.R * np.cos(self.theta)])
@@ -67,7 +67,10 @@ class Robot(Object):
 
             self.pos = np.array([retMatrix[0],retMatrix[1]])
             self.theta = retMatrix[2]
-            
+
+            aVec = self.ICC - self.pos
+            self.forward = np.array([-aVec[1],aVec[0]])
+
             print("forward= "+str(self.forward))
             #self.pos = self.pos + self.forward
 

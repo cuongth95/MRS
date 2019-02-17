@@ -11,6 +11,7 @@ from PyQt5.QtGui import QPainter, QColor
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 from Robot import Robot
+import numpy as np
 
 class MRS(QMainWindow):#(QWidget):#
     
@@ -61,11 +62,16 @@ class MRS(QMainWindow):#(QWidget):#
         if key == Qt.Key_O:
             print("pressO")
             self.doPress = True
-            self.robot.vr += 5  # self.robot.forward * 5
+            self.robot.vr += -5  # self.robot.forward * 5
         elif key == Qt.Key_L:
             print("pressL")
             self.doPress = True
-            self.robot.vr += -5  # self.robot.forward * -5#
+            self.robot.vr += 5  # self.robot.forward * -5#
+
+        if key == Qt.Key_C:
+            self.robot.setPosition(500,500)
+            self.robot.forward = np.array([1.,0.])
+            return None
 
         if self.doPress:
             print("vl= " + str(self.robot.vl) + ",vr=" + str(self.robot.vr))
