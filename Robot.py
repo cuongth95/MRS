@@ -41,9 +41,10 @@ class Robot(Object):
 
 
     def updateTransform(self,dt):
+        xAxes = np.array([1, 0])
         delta = self.vr - self.vl
         if delta != 0:
-            xAxes =np.array([1,0])
+
             self.rotation = delta / self.l
             self.R = self.l/2 * (self.vr + self.vl)/delta
             #temp1 = self.vl * xAxes#self.forward
@@ -76,20 +77,25 @@ class Robot(Object):
             #aVec = self.ICC - self.pos
             #aVec= np.linalg.norm(aVec,ord=1,keepdims=True)
             #self.forward = np.array([aVec[1],-aVec[0]])
-            temp = np.arccos(np.dot(self.forward, xAxes) / (
-                    np.linalg.norm(self.forward) * np.linalg.norm(xAxes)))  # self.angle(self.forward,np.array([1,0]))
+            #temp = np.arccos(np.dot(self.forward, xAxes) / (
+            #        np.linalg.norm(self.forward) * np.linalg.norm(xAxes)))  # self.angle(self.forward,np.array([1,0]))
 
-            print("forward= " + str(self.forward) + "|f = " + str(Utils.normalize(self.forward))+"|temp="+str(temp)+"|theta="+str(self.theta))
+            print("forward= " + str(self.forward))
             #self.pos = self.pos + self.forward
 
         elif self.vr == -self.vl and self.vr !=0:
             self.forward = np.zeros((1,2))
             self.rotation = 2 /self.l * self.vr
         elif self.vr !=0 :
+            #if self.vr < 0:
+            #    self.theta = -self.theta
+            self.forward = np.array(
+                [np.cos(self.theta) * xAxes[0] - np.sin(self.theta) * xAxes[1],
+                 np.sin(self.theta) * xAxes[0] + np.cos(self.theta) * xAxes[1],
+                 ])
+            print("forward= " + str(self.forward))
             self.ICC = self.pos
-            f = Utils.normalize(self.forward)
-            print("forward= " + str(self.forward) + "|f = " + str(f))
-            self.pos = self.pos + f#self.forward
+            self.pos = self.pos + self.forward * (self.vl+self.vr)/2
         return True
 
     '''

@@ -11,10 +11,14 @@ from PyQt5.QtGui import QPainter, QColor
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 from Robot import Robot
+from Wall import  Wall
 import numpy as np
 
 class MRS(QMainWindow):#(QWidget):#
-    
+
+    screenWidth = 1080
+    screenHeight= 720
+
     def __init__(self):
         #QWidget.__init__(self, None)
         super(MRS, self).__init__()
@@ -23,9 +27,19 @@ class MRS(QMainWindow):#(QWidget):#
 
     def initGame(self):
         self.robot = Robot()
+        #self.wallLeft = Wall()
+        #self.wallRight = Wall()
+        #self.wallTop = Wall()
+        #self.wallBot = Wall()
+
+        centerX,centerY = self.getCenter()
+        #print(str(centerX)+","+str(centerY))
+        self.wallMid = Wall(centerX,centerY,100,100)
         self.doPress = False
 
-        
+    def getCenter(self):
+        return (self.screenWidth/2,self.screenHeight/2)
+
     def initUI(self):    
         '''initiates application UI'''
 
@@ -46,6 +60,8 @@ class MRS(QMainWindow):#(QWidget):#
         self.worker.start()
 
     def updateLogic(self,dt):
+        #print("updating")
+        #self.robot.updateTransform(dt)
         return True
 
     def keyPressEvent(self, event):
@@ -58,7 +74,7 @@ class MRS(QMainWindow):#(QWidget):#
             print("pressS")
             self.doPress = True
             self.robot.vl += -5  # self.robot.forward * -5#
-        if key == Qt.Key_O:
+        elif key == Qt.Key_O:
             print("pressO")
             self.doPress = True
             self.robot.vr += 5  # self.robot.forward * 5
@@ -66,18 +82,36 @@ class MRS(QMainWindow):#(QWidget):#
             print("pressL")
             self.doPress = True
             self.robot.vr +=  -5  # self.robot.forward * -5#
+        elif key == Qt.Key_T:
+            print("pressT")
+            self.doPress = True
+            self.robot.vr +=  5
+            self.robot.vl +=  5
+
+        elif key == Qt.Key_G:
+            print("pressG")
+            self.doPress = True
+            self.robot.vr +=  -5
+            self.robot.vl +=  -5
+
+        elif key == Qt.Key_X:
+            print("pressX")
+            self.doPress = True
+            self.robot.vr = 0
+            self.robot.vl = 0
 
         if key == Qt.Key_C:
             self.robot.setPosition(500,500)
             self.robot.forward = np.array([1.,0.])
-            self.robot.rotation =0
+            self.robot.theta =0
             return None
 
         if self.doPress:
             print("vl= " + str(self.robot.vl) + ",vr=" + str(self.robot.vr))
             self.doPress = False
+            #self.robot.updateTransform(1)
             #self.robot.updatePosition(1)
-        #self.robot.updatePosition(1)
+
         self.robot.updateTransform(1)
         # self.robot.vl = 0
         #self.robot.vr = 0
@@ -86,8 +120,9 @@ class MRS(QMainWindow):#(QWidget):#
         qp = QPainter()
         qp.begin(self)
 
-        self.drawLines(qp)
+        #self.drawLines(qp)
         self.robot.draw(qp)
+        self.wallMid.draw(qp)
         #self.drawRobot(qp)
 
         qp.end()
