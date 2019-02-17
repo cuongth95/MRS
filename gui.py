@@ -5,16 +5,17 @@ from PyQt5.QtWidgets import QMainWindow, QFrame, QDesktopWidget, QApplication
 from PyQt5.QtWidgets import (QApplication, QComboBox, QDialog,
 QDialogButtonBox, QFormLayout, QGridLayout, QGroupBox, QHBoxLayout,
 QLabel, QLineEdit, QMenu, QMenuBar, QPushButton, QSpinBox, QTextEdit,
-QVBoxLayout)
+QVBoxLayout,QWidget)
 from PyQt5.QtCore import Qt, QBasicTimer, pyqtSignal
 from PyQt5.QtGui import QPainter, QColor 
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 from Robot import Robot
 
-class MRS(QMainWindow):
+class MRS(QMainWindow):#(QWidget):#
     
     def __init__(self):
+        #QWidget.__init__(self, None)
         super(MRS, self).__init__()
         self.initGame()
         self.initUI()
@@ -34,8 +35,9 @@ class MRS(QMainWindow):
         horizontalLayout = QHBoxLayout(self)
         verticalLayout = QVBoxLayout(self)
         verticalLayout.addLayout(horizontalLayout)
+        #verticalLayout.addWidget(self.robot)
+
         self.setLayout(verticalLayout)
-        
         self.resize(1080, 720)
         #self.center()
         self.setWindowTitle('Mobile Robot Simulator')        
@@ -68,8 +70,9 @@ class MRS(QMainWindow):
         if self.doPress:
             print("vl= " + str(self.robot.vl) + ",vr=" + str(self.robot.vr))
             self.doPress = False
-            self.robot.updatePosition(1)
+            #self.robot.updatePosition(1)
         #self.robot.updatePosition(1)
+        self.robot.updateTransform(1)
         # self.robot.vl = 0
         #self.robot.vr = 0
 

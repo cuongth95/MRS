@@ -9,6 +9,7 @@ from PyQt5.QtGui import QPainter, QColor
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 
+import Utils
 import numpy as np
 from Object import Object
 class Robot(Object):
@@ -18,7 +19,7 @@ class Robot(Object):
 
     def __init__(self,parent=None):
         super(Robot, self).__init__()
-        print("myId: "+str(self.id))
+        #print("myId: "+str(self.id))
         self.setPosition(500,500)
         self.forward = np.array([1.,0.])
         self.vl = 0#np.array([0.,0.])
@@ -27,13 +28,58 @@ class Robot(Object):
         self.size = 100.0
         self.l = 500/2
         self.ICC = self.pos
-        #self.theta = 0 #angle between Ox and forward vector
+        xAxes =np.array([1,0])
+        self.theta = np.arccos(np.dot(self.forward, xAxes) / (
+                    np.linalg.norm(self.forward) * np.linalg.norm(xAxes)))  # self.angle(self.forward,np.array([1,0]))
+
+    #angle between Ox and forward vector
 
     def setPosition(self,x,y):
         self.pos = np.array([x,y])
 
-    def updatePosition(self,dt):
 
+
+    def updateTransform(self,dt):
+        delta = self.vr - self.vl
+        if delta != 0:
+            xAxes =np.array([1,0])
+            self.rotation = delta / self.l
+            self.R = self.l/2 * (self.vr + self.vl)/delta
+            temp1 = self.vl * xAxes#self.forward
+            temp2 = self.vr * xAxes#self.forward
+
+            self.forward = (temp1 + temp2)/2
+
+            self.ICC = np.array([self.pos[0]- self.R * np.sin(self.theta),
+                                 self.pos[1]+ self.R * np.cos(self.theta)])
+
+            odt = self.rotation * dt
+            rotMatrix = np.array([[np.cos(odt),-np.sin(odt),0],
+                                  [np.sin(odt),np.cos(odt),0],
+                                  [0,0,1]])
+            toOriginMatrix = np.array([self.pos[0]-self.ICC[0],
+                                       self.pos[1]-self.ICC[1],
+                                       self.theta])
+            backLocationMatrix = np.array([self.ICC[0],
+                                           self.ICC[1],
+                                           odt])
+            retMatrix = np.dot(rotMatrix,toOriginMatrix) + backLocationMatrix
+
+            self.pos = np.array([retMatrix[0],retMatrix[1]])
+            self.theta = retMatrix[2]
+            
+            print("forward= "+str(self.forward))
+            #self.pos = self.pos + self.forward
+
+        elif self.vr == -self.vl and self.vr !=0:
+            self.forward = np.zeros((1,2))
+            self.rotation = 2 /self.l * self.vr
+        else:
+            self.pos = self.pos + self.forward
+
+        return True
+
+    def updatePosition(self,dt):
         delta = self.vr - self.vl#np.linalg.norm( self.vr - self.vl)
 
         if delta !=0 :
@@ -56,7 +102,8 @@ class Robot(Object):
 
             #self.forward = ( (self.vr + self.vl) / 2)
             #self.forward = self.forward/np.linalg.norm(self.forward)
-            self.forward *= np.array([xAxes[0] - np.sin(theta), xAxes[1] + self.R *np.cos(theta)])
+            #self.forward *= np.array([xAxes[0] - np.sin(theta), xAxes[1] + self.R *np.cos(theta)])
+            #self.forward = Utils.normalize(self.forward)
             #self.forward[0] =  xAxes[0] * np.cos(theta) - xAxes[1] * np.sin(theta)
             #self.forward[1] = xAxes[0] * np.sin(theta) + xAxes[1] * np.cos(theta)
             #np.cos(theta) = np.dot(self.forward, xAxes)
@@ -99,11 +146,11 @@ class Robot(Object):
         origin = self.pos + self.size/2
         pen2 = QPen(Qt.red, 0.5, Qt.SolidLine)
         qp.setPen(pen2)
-        qp.drawLine(origin[0], origin[1], origin[0]+self.forward[0], origin[1]+self.forward[1])
+        qp.drawLine(origin[0], origin[1], origin[0]+self.forward[0]*50, origin[1]+self.forward[1]*50)
 
         #ICC debug
-        pen = QPen(Qt.blue, 1.5, Qt.SolidLine)
-        qp.setPen(pen)
+        pen3 = QPen(Qt.blue, 1.5, Qt.SolidLine)
+        qp.setPen(pen3)
         qp.drawEllipse(self.ICC[0], self.ICC[1], self.size/3, self.size/3)
 
 
@@ -121,24 +168,40 @@ class Robot(Object):
 
     '''
     def paintEvent(self,event):
-        #print("updating render")
-        painter = QtGui.QPainter(self)
-        #painter.setPen(QtCore.Qt.NoPen)
-        painter.setBrush(QtCore.Qt.blue)
+        print("updating render")
+        painter = QPainter(self)
+        painter.setBrush(Qt.blue)
+        # body
+        #pen = QPen(Qt.red, 1.5, Qt.SolidLine)
+        #painter.setPen(pen)
+        painter.drawPie(QRectF(self.pos[0], self.pos[1], self.size, self.size), 0, 5760)
+        #painter.drawEllipse(self.pos[0], self.pos[1], self.size, self.size)
+        # forward
+        origin = self.pos + self.size / 2
+        #pen2 = QPen(Qt.red, 0.5, Qt.SolidLine)
+        #painter.setPen(pen2)
+        painter.drawLine(origin[0], origin[1], origin[0] + self.forward[0], origin[1] + self.forward[1])
+
+        # ICC debug
+        #pen3 = QPen(Qt.blue, 1.5, Qt.SolidLine)
+        #painter.setPen(pen3)
+        painter.drawEllipse(self.ICC[0], self.ICC[1], self.size / 3, self.size / 3)
+
+
 
         # painter.translate(0, self.rect().height())
         #print(str(self.x) + "," + str(self.y))
         #print("shape = "+str(self.pos.shape))
 
-        origin = np.array([self.pos[0]-self.size/2, self.pos[1]-self.size/2])
+        #origin = np.array([self.pos[0]-self.size/2, self.pos[1]-self.size/2])
 
-        painter.drawPie(QtCore.QRectF(origin[0], origin[1],self.size,self.size),0, 5760)
+        #painter.drawPie(QtCore.QRectF(origin[0], origin[1],self.size,self.size),0, 5760)
         #painter.drawPie(QtCore.QRectF(self.pos[0], self.pos[1],self.size,self.size),0, 5760)
-        painter.setBrush(QtCore.Qt.red)
-        painter.drawLine(QtCore.QLineF(self.pos[0],self.pos[1],self.pos[0]+self.forward[0]*100,self.pos[1]+self.forward[1]*100))
+        #painter.setBrush(QtCore.Qt.red)
+        #painter.drawLine(QtCore.QLineF(self.pos[0],self.pos[1],self.pos[0]+self.forward[0]*100,self.pos[1]+self.forward[1]*100))
 
 
-        painter.drawPie(QtCore.QRectF(self.ICC[0], self.ICC[1], self.size/3, self.size/3), 0, 5760)
+        #painter.drawPie(QtCore.QRectF(self.ICC[0], self.ICC[1], self.size/3, self.size/3), 0, 5760)
 
         #painter.(QtCore.QPointF(self.ICC[0],self.ICC[1]))
         # painter.rotate(-self.currentAngle)
