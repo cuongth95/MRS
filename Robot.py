@@ -17,16 +17,24 @@ class Robot(Object):
         angle = np.arccos(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)))
         return angle
 
+    def getVelocity(self):
+
+        return self.forward * (self.vl + self.vr)/2
+
+    def getShape(self):
+        return 2#Object.Shape.CIRCLE
+
     def __init__(self,parent=None):
         super(Robot, self).__init__()
         #print("myId: "+str(self.id))
-
+        self.point = np.array([0,0])
         self.setPosition(500,500)
         self.forward = np.array([1.,0.])
         self.vl = 0#np.array([0.,0.])
         self.vr = 0#np.array([0.,0.])
         self.v = (self.vl+self.vr)/2
         self.size = 100.0
+        self.rsize = np.array([self.size,self.size])
         self.l = 500/2
         self.ICC = self.pos
         xAxes =np.array([1,0])
@@ -39,6 +47,25 @@ class Robot(Object):
         self.pos = np.array([x,y])
 
 
+
+    def onCollisionWith(self, obj, normalX, normalY, colTime):
+        '''
+        remainTime = 1 - colTime
+        magnitude = self.getVelocity() * remainTime
+
+        if normalX == -1: #  left of obj
+            self.pos[0] -=1
+        if normalX == 1:  # right of obj
+            self.pos[0] +=1
+        if normalY == 1:  # bot of obj
+            self.pos[1] +=1
+        if normalY == -1: # top of obj
+            self.pos[1] -=1
+        '''
+        self.pos = self.pos - self.forward
+        self.vl = self.vr = 0
+
+        return True
 
     def updateTransform(self,dt):
         xAxes = np.array([1, 0])
@@ -80,7 +107,7 @@ class Robot(Object):
             #temp = np.arccos(np.dot(self.forward, xAxes) / (
             #        np.linalg.norm(self.forward) * np.linalg.norm(xAxes)))  # self.angle(self.forward,np.array([1,0]))
 
-            print("forward= " + str(self.forward))
+            #print("forward= " + str(self.forward))
             #self.pos = self.pos + self.forward
 
         elif self.vr == -self.vl and self.vr !=0:
@@ -93,9 +120,11 @@ class Robot(Object):
                 [np.cos(self.theta) * xAxes[0] - np.sin(self.theta) * xAxes[1],
                  np.sin(self.theta) * xAxes[0] + np.cos(self.theta) * xAxes[1],
                  ])
-            print("forward= " + str(self.forward))
+            #print("forward= " + str(self.forward))
             self.ICC = self.pos
             self.pos = self.pos + self.forward * (self.vl+self.vr)/2
+
+
         return True
 
     '''
@@ -159,10 +188,12 @@ class Robot(Object):
 
     def draw(self,qp):
         #body
-        origin = np.array([self.pos[0] - self.size/2,self.pos[1] - self.size/2])
+        origin = np.array([self.pos[0] - self.rsize[0]/2,self.pos[1] - self.rsize[0]/2])
         pen = QPen(Qt.red, 1.5, Qt.SolidLine)
         qp.setPen(pen)
-        qp.drawEllipse(origin[0], origin[1], self.size, self.size)
+        qp.drawEllipse(origin[0], origin[1], self.rsize[0], self.rsize[0])
+
+        #qp.drawPie(QRectF(origin[0], origin[1], self.size, self.size), 0, 5760)
         #forward
         pen2 = QPen(Qt.red, 0.5, Qt.SolidLine)
         qp.setPen(pen2)
@@ -174,9 +205,30 @@ class Robot(Object):
         qp.setPen(pen3)
         qp.drawEllipse(self.ICC[0], self.ICC[1], self.size/4, self.size/4)
 
+        #bounding box debug
+        #pen4 =QPen(Qt.yellow, 1.5, Qt.SolidLine)
+        #qp.setPen(pen4)
+        #qp.drawRect(origin[0], origin[1], self.rsize[0], self.rsize[1])
 
+        #velocity debug
+        vec=self.getVelocity()
+        pen5 = QPen(Qt.magenta, 1.5, Qt.SolidLine)
+        qp.setPen(pen5)
+        qp.drawLine(self.pos[0], self.pos[1], self.pos[0] +vec[0], self.pos[1] +vec[1])
         #left wheel - todo come back later
         '''
+        pen6 = QPen(Qt.green, 5, Qt.SolidLine)
+        qp.setPen(pen6)
+        qp.drawPoint(self.point[0],self.point[1])
+
+        pen6 = QPen(Qt.darkBlue, 1.5, Qt.SolidLine)
+        qp.setPen(pen6)
+        qp.drawLine(self.pos[0], self.pos[1], self.point[0],self.point[1])
+
+        pen6 = QPen(Qt.darkBlue, 1.5, Qt.SolidLine)
+        qp.setPen(pen6)
+        qp.drawLine(self.pos[0], self.pos[1], self.point[0],self.point[1])
+        
         pen3 = QPen(Qt.blue, 0.5, Qt.SolidLine)
         qp.setPen(pen3)
         qp.drawLine(55, 50, 75, 50)

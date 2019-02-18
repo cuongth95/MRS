@@ -12,6 +12,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 from Robot import Robot
 from Wall import  Wall
+from Object import Object
 import numpy as np
 
 class MRS(QMainWindow):#(QWidget):#
@@ -26,6 +27,7 @@ class MRS(QMainWindow):#(QWidget):#
         self.initUI()
 
     def initGame(self):
+        self.walls = []
         self.robot = Robot()
         #self.wallLeft = Wall()
         #self.wallRight = Wall()
@@ -33,9 +35,10 @@ class MRS(QMainWindow):#(QWidget):#
         #self.wallBot = Wall()
 
         centerX,centerY = self.getCenter()
-        #print(str(centerX)+","+str(centerY))
         self.wallMid = Wall(centerX,centerY,100,100)
+        self.walls.append(self.wallMid)
         self.doPress = False
+        self.timer = QBasicTimer()
 
     def getCenter(self):
         return (self.screenWidth/2,self.screenHeight/2)
@@ -56,16 +59,22 @@ class MRS(QMainWindow):#(QWidget):#
         #self.center()
         self.setWindowTitle('Mobile Robot Simulator')        
         self.show()
-        self.worker = Worker(self)
-        self.worker.start()
+        #self.worker = Worker(self)
+        #self.worker.start()
+        self.lastFrameTime = time.time()
+        self.timer.start(17,self)
 
     def updateLogic(self,dt):
-        #print("updating")
-        #self.robot.updateTransform(dt)
+        #print("dt="+str(dt))
+        if self.robot.checkCollision(self.wallMid):
+            print("hehe")
+        self.robot.updateTransform(dt)
         return True
 
     def keyPressEvent(self, event):
         key = event.key()
+        prevVl = self.robot.vl
+        prevVr = self.robot.vr
         if key == Qt.Key_W:
             print("pressW")
             self.doPress = True
@@ -96,7 +105,7 @@ class MRS(QMainWindow):#(QWidget):#
 
         elif key == Qt.Key_X:
             print("pressX")
-            self.doPress = True
+            #self.doPress = True
             self.robot.vr = 0
             self.robot.vl = 0
 
@@ -109,10 +118,12 @@ class MRS(QMainWindow):#(QWidget):#
         if self.doPress:
             print("vl= " + str(self.robot.vl) + ",vr=" + str(self.robot.vr))
             self.doPress = False
+
             #self.robot.updateTransform(1)
             #self.robot.updatePosition(1)
 
-        self.robot.updateTransform(1)
+
+        #self.robot.updateTransform(1)
         # self.robot.vl = 0
         #self.robot.vr = 0
 
@@ -124,7 +135,6 @@ class MRS(QMainWindow):#(QWidget):#
         self.robot.draw(qp)
         self.wallMid.draw(qp)
         #self.drawRobot(qp)
-
         qp.end()
         
         
@@ -160,8 +170,16 @@ class MRS(QMainWindow):#(QWidget):#
         #size = self.geometry()
         #self.move((screen.width()-size.width())/2, 
             #(screen.height()-size.height())/2)
-        
 
+    def timerEvent(self, event):
+        if event.timerId() == self.timer.timerId():
+            currentTime = time.time()
+            dt = (currentTime - self.lastFrameTime)
+            self.lastFrameTime = currentTime
+            self.updateLogic(dt)
+            self.update()
+        else:
+            super(MRS, self).timerEvent(event)
 
 class Worker(QThread):
 
@@ -189,12 +207,16 @@ class Worker(QThread):
                 #print("dt:"+str(dt*1000))
                 #self.game.processEvents()
                 self.game.updateLogic(dt)
+
                 #self.game.processEvents()
                 #self.game.render()
             self.game.update()
 
 
+
 if __name__ == '__main__':
+    QApplication.processEvents()
+
     app = QApplication([])
-    mygui = MRS()    
+    game = MRS()
     sys.exit(app.exec_())
