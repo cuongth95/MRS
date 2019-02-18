@@ -35,8 +35,13 @@ class MRS(QMainWindow):#(QWidget):#
         #self.wallBot = Wall()
 
         centerX,centerY = self.getCenter()
-        self.wallMid = Wall(centerX,centerY,100,100)
-        self.walls.append(self.wallMid)
+        #self.wallMid =
+        self.walls.append(Wall(centerX,centerY,100,100))
+        self.walls.append(Wall(centerX-self.screenWidth/2, centerY, 20, self.screenHeight))
+        self.walls.append(Wall(centerX+self.screenWidth/2, centerY, 20, self.screenHeight))
+        self.walls.append(Wall(centerX, centerY-self.screenHeight/2, self.screenWidth, 20))
+        self.walls.append(Wall(centerX, centerY+self.screenHeight/2, self.screenWidth, 20))
+
         self.doPress = False
         self.isCollided = False
         self.timer = QBasicTimer()
@@ -67,12 +72,41 @@ class MRS(QMainWindow):#(QWidget):#
 
     def updateLogic(self,dt):
         #print("dt="+str(dt))
-        self.isCollided = self.robot.checkCollision(self.wallMid)
-        #box = self.robot.getBoundingBox(self.robot)
-        #box.pos = np.array(
-        #    [self.robot.pos[0] + self.robot.getVelocity()[0], self.robot.pos[1] + self.robot.getVelocity()[1]])
-        #if box.quickCheck2(box, self.wallMid):
+
+
+        '''
+        if self.isCollided == False:
+            box = self.robot.clone(assignId=False)
+            box.pos = np.array(
+                [self.robot.pos[0] + self.robot.getVelocity()[0], self.robot.pos[1] + self.robot.getVelocity()[1]])
+            for wall in self.walls:
+                if  box.checkCollision(wall):
+                    self.isCollided = True
+                    break
+        '''
+        #if not self.isCollided:
+        prevPos = self.robot.pos
+
+        self.isCollided = False
+
+        for wall in self.walls:
+            temp = self.robot.checkCollision(wall)
+            if self.isCollided == False:
+                self.isCollided = temp
+
+        #if not self.isCollided:
         self.robot.updateTransform(dt)
+
+        '''
+        self.isCollided = False
+        for wall in self.walls:
+            if self.robot.checkCollision(wall,doResponse=False):
+                self.isCollided = True
+                break
+
+        if self.isCollided:
+            self.robot.pos= prevPos
+        '''
         return True
 
     def keyPressEvent(self, event):
@@ -144,7 +178,9 @@ class MRS(QMainWindow):#(QWidget):#
 
         #self.drawLines(qp)
         self.robot.draw(qp)
-        self.wallMid.draw(qp)
+        for wall in self.walls:
+            wall.draw(qp)
+        #self.wallMid.draw(qp)
         #self.drawRobot(qp)
         qp.end()
         

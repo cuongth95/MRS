@@ -37,9 +37,10 @@ class Robot(Object):
         self.v = (self.vl+self.vr)/2
         self.size = 100.0
         self.rsize = np.array([self.size,self.size])
-        self.l = 500/2
+        self.l = 250
         self.ICC = self.pos
         self.rotation =0
+        self.R = 0
         xAxes =np.array([1,0])
         self.theta = np.arccos(np.dot(self.forward, xAxes) / (
                     np.linalg.norm(self.forward) * np.linalg.norm(xAxes)))  # self.angle(self.forward,np.array([1,0]))
@@ -60,29 +61,48 @@ class Robot(Object):
         #    normalX = 0
         if normalX == 0 or normalY ==0:
             if normalX == -1: #  left of obj
-                self.pos[0] = (contractPoint[0]-self.rsize[0]/2 - 0.1)#(obj.pos[0]-obj.rsize[0]/2-self.rsize[0]/2 - 0.1) #(self.forward[0]+0.1)
+                self.pos[0] =(contractPoint[0]-self.rsize[0]/2 - 0.1)#(obj.pos[0]-obj.rsize[0]/2-self.rsize[0]/2 - 0.1) #
             elif normalX == 1:  # right of obj
-                self.pos[0] = (contractPoint[0]+self.rsize[0]/2 + 0.1)#(obj.pos[0]+obj.rsize[0]/2+self.rsize[0]/2 + 0.1) #(self.forward[0]+0.1)
+                self.pos[0] = (contractPoint[0]+self.rsize[0]/2 + 0.1)#(obj.pos[0]+obj.rsize[0]/2+self.rsize[0]/2 + 0.1) #
             if normalY == 1:  # bot of obj
-                self.pos[1] = (contractPoint[1]+ self.rsize[0] / 2 + 0.1)#(obj.pos[1] + obj.rsize[1] / 2 + self.rsize[0] / 2 + 0.1)  # (self.forward[1]+0.1)
+                self.pos[1] =(contractPoint[1]+ self.rsize[0] / 2 + 0.1)# (obj.pos[1] + obj.rsize[1] / 2 + self.rsize[0] / 2 + 0.1) #
             elif normalY == -1:  # top of obj
-                self.pos[1] = (contractPoint[1]- self.rsize[0] / 2 - 0.1)#(obj.pos[1] - obj.rsize[1] / 2 - self.rsize[0] / 2 - 0.1)  # (self.forward[1]+0.1)
+                self.pos[1] = (contractPoint[1]- self.rsize[0] / 2 - 0.1)#(obj.pos[1] - obj.rsize[1] / 2 - self.rsize[0] / 2 - 0.1) #
 
+            planeVec = np.array([normalY,-normalX])
+            slidingVec = np.multiply(self.forward,planeVec)/ (planeVec[0]**2+planeVec[1]**2) * planeVec
+            if slidingVec[0] == 0 and slidingVec[0] == 0:
+                self.vl = self.vr = 0
+            else:
+                self.forward =slidingVec
+                self.theta = np.arccos(np.dot(self.forward, np.array([1, 0])) / (
+                    np.linalg.norm(self.forward) * np.linalg.norm(np.array([1, 0]))))  # self.angle(self.forward,np.array([1,0]))
+            '''
             reverseNormal = np.array([-normalX, -normalY])
-
             slidingVec = self.forward - reverseNormal
-
-            self.forward = slidingVec
+            slidingVec = np.array([normalY,-normalX])
+            if np.all(slidingVec == 0):
+                self.vl = self.vr = 0
+            else:
+                slidingVec = Utils.normalizeByDivideNorm(slidingVec)
+                self.forward = -slidingVec
+                self.theta = np.arccos(np.dot(self.forward, np.array([1,0])) / (
+                       np.linalg.norm(self.forward) * np.linalg.norm(np.array([1, 0]))))  # self.angle(self.forward,np.array([1,0]))
+            '''
         else:
             nx = self.pos[0] - self.point[0]
             ny = self.pos[1] - self.point[1]
 
-            length = np.sqrt(nx * nx + ny * ny)
-            nx /= length
-            ny /= length
+            n = np.array([nx,ny])
+            n = Utils.normalizeByDivideNorm(n)
+
             #projection = self.forward[0] * nx + self.forward[1] * ny
-            self.pos = contractPoint + (np.array([nx,ny])*(self.rsize[0]/2 +0.1))
-            self.forward = np.array([nx,ny])
+            self.pos = contractPoint + n*(self.rsize[0]/2 +0.1)
+            #self.forward = np.array([nx, ny])
+            #self.theta = np.arccos(np.dot(self.forward, np.array([1, 0])) / (
+            #        np.linalg.norm(self.forward) * np.linalg.norm(
+            #    np.array([1, 0]))))  # self.angle(self.forward,np.array([1,0]))
+
 
         #self.vl = self.vr = 0
         return True
@@ -132,7 +152,7 @@ class Robot(Object):
             #self.pos = self.pos + self.forward
 
         elif self.vr == -self.vl and self.vr !=0:
-            self.forward = np.zeros((1,2))
+            #self.forward = np.zeros((1,2))
             self.rotation = 2 /self.l * self.vr
         elif self.vr !=0 :
             #if self.vr < 0:
@@ -145,9 +165,9 @@ class Robot(Object):
             f = np.copy(self.forward)
             f/= np.linalg.norm(self.forward)
 
+            self.rotation =0
             self.ICC = self.pos
             self.pos = self.pos + f * (self.vl+self.vr)/2
-
 
         return True
 
@@ -162,6 +182,8 @@ class Robot(Object):
         cloner.theta = self.theta
         cloner.vl = self.vl
         cloner.vr = self.vr
+        cloner.R = self.R
+        cloner.l = self.l
         return cloner
 
 
@@ -239,7 +261,7 @@ class Robot(Object):
         qp.drawLine(self.pos[0], self.pos[1], self.pos[0]+f[0]*self.size/2, self.pos[1]+f[1]*self.size/2)
 
         #ICC debug
-        pen3 = QPen(Qt.blue, 1.5, Qt.SolidLine)
+        pen3 = QPen(Qt.magenta, 1.5, Qt.SolidLine)
         qp.setPen(pen3)
         qp.drawEllipse(self.ICC[0], self.ICC[1], self.size/4, self.size/4)
 
@@ -250,10 +272,10 @@ class Robot(Object):
         #qp.drawRect(origin[0], origin[1], self.rsize[0], self.rsize[1])
 
         #velocity debug
-        vec=self.getVelocity()
-        pen5 = QPen(Qt.magenta, 1.5, Qt.SolidLine)
-        qp.setPen(pen5)
-        qp.drawLine(self.pos[0], self.pos[1], self.pos[0] +vec[0], self.pos[1] +vec[1])
+        #vec=self.getVelocity()
+        #pen5 = QPen(Qt.magenta, 1.5, Qt.SolidLine)
+        #qp.setPen(pen5)
+        #qp.drawLine(self.pos[0], self.pos[1], self.pos[0] +vec[0], self.pos[1] +vec[1])
         #left wheel - todo come back later
 
         pen6 = QPen(Qt.green, 5, Qt.SolidLine)
@@ -264,6 +286,28 @@ class Robot(Object):
         pen = QPen(Qt.black, 10, Qt.SolidLine)
         qp.setPen(pen)
         qp.drawLine(self.point[0],self.point[1],self.point[0]+self.normal[0],self.point[1]+self.normal[1])
+
+        pen = QPen(Qt.black, 10, Qt.SolidLine)
+        qp.setPen(pen)
+
+        #draw texts
+
+        pVec = np.array([self.forward[1],-self.forward[0]])
+        lefTextPos = self.pos + pVec * 50
+
+        pen = QPen(Qt.blue, 1, Qt.SolidLine)
+        qp.setPen(pen)
+
+        #qp.drawPoint(textPos[0], textPos[1])
+        qp.drawText(QPointF(lefTextPos[0] ,lefTextPos[1] ),str(self.vl))
+
+        rightTextPos = self.pos + pVec * -50
+        pen = QPen(Qt.red, 1, Qt.SolidLine)
+        qp.setPen(pen)
+
+        # qp.drawPoint(textPos[0], textPos[1])
+        qp.drawText(QPointF(rightTextPos[0], rightTextPos[1]), str(self.vr))
+
         '''
         pen6 = QPen(Qt.darkBlue, 1.5, Qt.SolidLine)
         qp.setPen(pen6)
