@@ -2,6 +2,7 @@ import abc
 import math
 from PyQt5 import QtCore, QtGui, QtWidgets
 import numpy as np
+import Utils
 class Object:#(QtWidgets.QWidget):
     #static things
     idCounter=0
@@ -14,12 +15,13 @@ class Object:#(QtWidgets.QWidget):
 
 
     #constructor
-    def __init__(self,parent=None,assignId=True):
+    def __init__(self,parent=None,assignId=True,collisionShape=1):
         #QtWidgets.QWidget.__init__(self, parent)
         if assignId:
             self.id = self.getId(self)
         else:
             self.id = -1
+        self.shape = collisionShape
         self.pos = np.array([0,0])
         self.forward = np.array([1,0]) #right
         self.rsize = np.array([0,0])
@@ -36,13 +38,17 @@ class Object:#(QtWidgets.QWidget):
 
     @abc.abstractmethod
     def getShape(self):
-        return 1#shape.SQUARE
+        return self.shape#shape.SQUARE by default
     @abc.abstractmethod
     def getVelocity(self):
         return self.forward
 
     @abc.abstractmethod
-    def onCollisionWith(self,obj,normalX,normalY,colTime):
+    def onCollisionWith(self,obj,normalX,normalY,contractPoint):
+        return True
+
+    @abc.abstractmethod
+    def onCollisionWith2(self, obj):
         return True
 
     def AABB(self,obj):
@@ -119,6 +125,61 @@ class Object:#(QtWidgets.QWidget):
                     normaly = -1.0
             return entryTime,normalx,normaly
 
+
+
+    def checkCollision(self,other,doResponse=True):
+        isCollision,normal,contractPoint = self.quickCheck2(self, other)
+        if isCollision and doResponse:
+            #print("collided")
+            #collideTime,normalX,normalY = self.AABB(other)
+            #friction here- but i dont use
+
+            '''
+            if collideTime < 1:
+                self.onCollisionWith(other,normalX,normalY,collideTime)
+                other.onCollisionWith(self, normalX, normalY, collideTime)
+                isCollision =True
+                print("collided")
+            '''
+            self.onCollisionWith(other, normal[0], normal[1], contractPoint)
+            other.onCollisionWith(self, -normal[0],-normal[1] , contractPoint)
+            #self.onCollisionWith2(other)
+            #other.onCollisionWith2(self)
+            #isCollision = True
+
+
+        return isCollision
+
+    def getBoundingBox(self, obj):
+        box = Object(assignId=False,collisionShape=obj.getShape())
+        box.pos = np.copy(obj.pos)
+        box.rsize = np.copy(obj.rsize)
+        return box
+    @abc.abstractmethod
+    def clone(self,obj,assignId=False):
+        cloner = Object(assignId=assignId, collisionShape=obj.getShape())
+        cloner.pos = np.copy(obj.pos)
+        cloner.rsize = np.copy(obj.rsize)
+        return cloner
+
+    def quickCheck2(self, a, b):
+        isCollision = True
+        selfShape =  a.getShape()
+        otherShape = b.getShape()
+        if selfShape == 2 and otherShape == 1:
+            isCollision, normal,contractPoint= self.circleRect2(a.pos[0], a.pos[1], a.rsize[0], b.pos[0], b.pos[1], b.rsize[0], b.rsize[1])
+        elif selfShape ==1 and otherShape ==1:
+            isCollision,normal,contractPoint= self.rectRect(a,b)
+        elif selfShape == 2 and otherShape ==2:
+            isCollision,normal,contractPoint= self.circleCircle(a,b)
+
+        normal = Utils.normalize(normal)
+        self.normal = normal
+
+        #normal = normal/(np.)
+
+        return isCollision,normal,contractPoint
+
     def circleRect2(self, cx, cy, rad, rx, ry, rw, rh):
         px = cx
         py = cy
@@ -147,78 +208,31 @@ class Object:#(QtWidgets.QWidget):
         #dRad = rad**2
 
         if temp <= rad/2:
-            return True
+            return True,np.array([cx-px,cy-py]),np.array([px,py])
         else:
-            return False
+            return False,np.array([0,0]),np.array([0,0])
 
-    def circleRect(self,cx,cy,rad,rx,ry,rw,rh):
-        testX =cx
-        testY =cy
-        if (cx > rx):
-            testX = rx
-        elif (cx < rx+rw):
-            testX = rx + rw
-        if (cy > ry):
-            testY = ry
-        elif (cy < ry+rh):
-            testY = ry+rh
+    def circleCircle(self,a,b):
+        dx = a.pos[0] - b.pos[0]
+        dy = a.pos[1] - b.pos[1]
+        d = np.array([dx, dy])
+        temp = math.sqrt(dx ** 2 + dy ** 2)
 
-        distX = cx-testX
-        distY = cy-testY
-        dist = math.sqrt(distX*distX + distY*distY)
-
-        if dist <= rad:
-            return True
+        if temp <= a.rsize[0] + b.rsize[0]:
+            return True,np.array([b.pos[0]-(a.pos[0]+a.rsize[0]),b.pos[1]-(a.pos[1]+a.rsize[1])]),(a.pos + b.pos)/2
         else:
-            return False
-
-    def checkCollision(self,other):
-        isCollision = False
-
-        selfShape = self.getShape()
-        otherShape =other.getShape()
-        '''
-        if selfShape == 2 and otherShape == 1:
-            deltaVec=  self.pos - other.pos
-            isCollision = self.circleRect(self.pos[0],self.pos[1],self.rsize[0]
-                                     ,other.pos[0],other.pos[1],other.rsize[0],other.rsize[1])
-
-            if isCollision:
-                self.onCollisionWith(other, 0, 0, 0)
-                other.onCollisionWith(self, 0, 0, 0)
-
-                print("collided")
-        '''
-        #myBox = self.getBoundingBox(self)
-        if selfShape == 2 and otherShape == 1:
-            if self.quickCheck2(self,other): #self.circleRect(self.pos[0],self.pos[1],self.rsize[0]
-                                         #,other.pos[0]-other.rsize[0]/2,other.pos[1]-other.rsize[1] / 2,other.rsize[0],other.rsize[1]):
-                print("collided")
-                '''
-                collideTime,normalX,normalY = self.AABB(other)
-                #friction here- but i dont use
-    
-                if collideTime <= 1:
-                    self.onCollisionWith(other,normalX,normalY,collideTime)
-                    other.onCollisionWith(self, normalX, normalY, collideTime)
-                    isCollision =True
-                    print("collided")
-                '''
-
-        return isCollision
-
-    def getBoundingBox(self, obj):
-        box = Object(assignId=False)
-        box.pos = np.copy(obj.pos)
-        box.rsize = np.copy(obj.rsize)
-        return box
-
-    def quickCheck2(self, a, b):
-        return self.circleRect2(a.pos[0], a.pos[1], a.rsize[0], b.pos[0], b.pos[1], b.rsize[0], b.rsize[1])
-
-    def quickCheck(self, a, b):
-        return not(a.pos[0] + a.rsize[0] < b.pos[0]
+            return False,np.array([0,0]),np.array([0,0])
+    def rectRect(self, a, b):
+        temp = not(a.pos[0] + a.rsize[0] < b.pos[0]
             or a.pos[0] > b.pos[0] + b.rsize[0]
             or a.pos[1] + a.rsize[1] < b.pos[1]
-            or a.pos[1] > b.pos[1] + b.rsize[1] )
+            or a.pos[1] > b.pos[1] + b.rsize[1] ),np.array([0,0])
+
+        if temp:
+            colTime, normalx, normaly =a.AABB(b)
+            if colTime <1:
+                return True,np.array([normalx,normaly]),np.array([0,0]),(a.pos + b.pos)/2
+
+        return False,np.array([0,0]),np.array([0,0])
+
 

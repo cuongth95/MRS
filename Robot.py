@@ -24,10 +24,12 @@ class Robot(Object):
     def getShape(self):
         return 2#Object.Shape.CIRCLE
 
-    def __init__(self,parent=None):
-        super(Robot, self).__init__()
+    def __init__(self,parent=None,assignId=True):
+        super(Robot, self).__init__(assignId=assignId)
         #print("myId: "+str(self.id))
         self.point = np.array([0,0])
+        self.normal = np.array([0,0])
+
         self.setPosition(500,500)
         self.forward = np.array([1.,0.])
         self.vl = 0#np.array([0.,0.])
@@ -37,6 +39,7 @@ class Robot(Object):
         self.rsize = np.array([self.size,self.size])
         self.l = 500/2
         self.ICC = self.pos
+        self.rotation =0
         xAxes =np.array([1,0])
         self.theta = np.arccos(np.dot(self.forward, xAxes) / (
                     np.linalg.norm(self.forward) * np.linalg.norm(xAxes)))  # self.angle(self.forward,np.array([1,0]))
@@ -48,24 +51,42 @@ class Robot(Object):
 
 
 
-    def onCollisionWith(self, obj, normalX, normalY, colTime):
-        '''
-        remainTime = 1 - colTime
-        magnitude = self.getVelocity() * remainTime
+    def onCollisionWith(self, obj, normalX, normalY, contractPoint):
 
-        if normalX == -1: #  left of obj
-            self.pos[0] -=1
-        if normalX == 1:  # right of obj
-            self.pos[0] +=1
-        if normalY == 1:  # bot of obj
-            self.pos[1] +=1
-        if normalY == -1: # top of obj
-            self.pos[1] -=1
-        '''
-        self.pos = self.pos - self.forward
-        self.vl = self.vr = 0
+        #remainTime = 1 - colTime
+        #magnitude = self.getVelocity() * remainTime
+        print("normalX ="+str(normalX) +",normalY="+str(normalY))
+        #if normalX != 0 and normalY != 0:
+        #    normalX = 0
+        if normalX == 0 or normalY ==0:
+            if normalX == -1: #  left of obj
+                self.pos[0] = (contractPoint[0]-self.rsize[0]/2 - 0.1)#(obj.pos[0]-obj.rsize[0]/2-self.rsize[0]/2 - 0.1) #(self.forward[0]+0.1)
+            elif normalX == 1:  # right of obj
+                self.pos[0] = (contractPoint[0]+self.rsize[0]/2 + 0.1)#(obj.pos[0]+obj.rsize[0]/2+self.rsize[0]/2 + 0.1) #(self.forward[0]+0.1)
+            if normalY == 1:  # bot of obj
+                self.pos[1] = (contractPoint[1]+ self.rsize[0] / 2 + 0.1)#(obj.pos[1] + obj.rsize[1] / 2 + self.rsize[0] / 2 + 0.1)  # (self.forward[1]+0.1)
+            elif normalY == -1:  # top of obj
+                self.pos[1] = (contractPoint[1]- self.rsize[0] / 2 - 0.1)#(obj.pos[1] - obj.rsize[1] / 2 - self.rsize[0] / 2 - 0.1)  # (self.forward[1]+0.1)
 
+            reverseNormal = np.array([-normalX, -normalY])
+
+            slidingVec = self.forward - reverseNormal
+
+            self.forward = slidingVec
+        else:
+            nx = self.pos[0] - self.point[0]
+            ny = self.pos[1] - self.point[1]
+
+            length = np.sqrt(nx * nx + ny * ny)
+            nx /= length
+            ny /= length
+            #projection = self.forward[0] * nx + self.forward[1] * ny
+            self.pos = contractPoint + (np.array([nx,ny])*(self.rsize[0]/2 +0.1))
+            self.forward = np.array([nx,ny])
+
+        #self.vl = self.vr = 0
         return True
+
 
     def updateTransform(self,dt):
         xAxes = np.array([1, 0])
@@ -121,11 +142,28 @@ class Robot(Object):
                  np.sin(self.theta) * xAxes[0] + np.cos(self.theta) * xAxes[1],
                  ])
             #print("forward= " + str(self.forward))
+            f = np.copy(self.forward)
+            f/= np.linalg.norm(self.forward)
+
             self.ICC = self.pos
-            self.pos = self.pos + self.forward * (self.vl+self.vr)/2
+            self.pos = self.pos + f * (self.vl+self.vr)/2
 
 
         return True
+
+    def clone(self,assignId=False ):
+        cloner = Robot(assignId)
+        cloner.pos = np.copy(self.pos)
+        cloner.size = np.copy(self.size)
+        cloner.rsize = np.copy(self.rsize)
+        cloner.ICC   = np.copy(self.ICC)
+        cloner.forward = np.copy(self.forward)
+        cloner.rotation = self.rotation
+        cloner.theta = self.theta
+        cloner.vl = self.vl
+        cloner.vr = self.vr
+        return cloner
+
 
     '''
     def updatePosition(self,dt):
@@ -205,6 +243,7 @@ class Robot(Object):
         qp.setPen(pen3)
         qp.drawEllipse(self.ICC[0], self.ICC[1], self.size/4, self.size/4)
 
+
         #bounding box debug
         #pen4 =QPen(Qt.yellow, 1.5, Qt.SolidLine)
         #qp.setPen(pen4)
@@ -216,11 +255,16 @@ class Robot(Object):
         qp.setPen(pen5)
         qp.drawLine(self.pos[0], self.pos[1], self.pos[0] +vec[0], self.pos[1] +vec[1])
         #left wheel - todo come back later
-        '''
+
         pen6 = QPen(Qt.green, 5, Qt.SolidLine)
         qp.setPen(pen6)
         qp.drawPoint(self.point[0],self.point[1])
 
+
+        pen = QPen(Qt.black, 10, Qt.SolidLine)
+        qp.setPen(pen)
+        qp.drawLine(self.point[0],self.point[1],self.point[0]+self.normal[0],self.point[1]+self.normal[1])
+        '''
         pen6 = QPen(Qt.darkBlue, 1.5, Qt.SolidLine)
         qp.setPen(pen6)
         qp.drawLine(self.pos[0], self.pos[1], self.point[0],self.point[1])

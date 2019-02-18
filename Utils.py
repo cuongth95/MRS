@@ -1,14 +1,22 @@
 import numpy as np
 
 def normalize(vec):
-    # get max and min
-    maxVec = max(vec)
-    minVec = min(vec)
+    vecN = np.array([0,0])
+    if vec[0] <0:
+        vecN[0] = - 1
+    elif vec[0] >0:
+        vecN[0] = 1
+    else:
+        vecN[0] = 0
 
-    if maxVec == minVec:
-        return np.zeros(vec.shape)
-    # normalize to -1...1
-    #1.0 / sum(vec) * vec  # (
-    vecN = (vec-minVec) /(maxVec-minVec) #- 0.5 ) *2;
-    #vecN = ((vec - minVec)/ (maxVec - minVec) - 0.5) * 2
+    #if vecN[0] != 0:
+    #   vecN[1] =0
+    #    return vecN
+
+    if vec[1] <0:
+        vecN[1] = - 1
+    elif vec[1] >0:
+        vecN[1] = 1
+    else:
+        vecN[1] = 0
     return vecN

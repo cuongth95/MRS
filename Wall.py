@@ -12,6 +12,7 @@ class Wall(Object):
         super(Wall, self).__init__()
         self.rsize = np.array([width,height])
         self.pos = np.array([x,y])
+        self.normal = np.array([0,0])
 
     def setSize(self,width,height):
         self.rsize = np.array([width,height])
@@ -21,3 +22,4 @@ class Wall(Object):
         pen = QPen(Qt.red, 1.5, Qt.SolidLine)
         qp.setPen(pen)
         qp.drawRect(origin[0],origin[1],self.rsize[0],self.rsize[1])
+

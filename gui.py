@@ -38,6 +38,7 @@ class MRS(QMainWindow):#(QWidget):#
         self.wallMid = Wall(centerX,centerY,100,100)
         self.walls.append(self.wallMid)
         self.doPress = False
+        self.isCollided = False
         self.timer = QBasicTimer()
 
     def getCenter(self):
@@ -66,8 +67,11 @@ class MRS(QMainWindow):#(QWidget):#
 
     def updateLogic(self,dt):
         #print("dt="+str(dt))
-        if self.robot.checkCollision(self.wallMid):
-            print("hehe")
+        self.isCollided = self.robot.checkCollision(self.wallMid)
+        #box = self.robot.getBoundingBox(self.robot)
+        #box.pos = np.array(
+        #    [self.robot.pos[0] + self.robot.getVelocity()[0], self.robot.pos[1] + self.robot.getVelocity()[1]])
+        #if box.quickCheck2(box, self.wallMid):
         self.robot.updateTransform(dt)
         return True
 
@@ -94,14 +98,14 @@ class MRS(QMainWindow):#(QWidget):#
         elif key == Qt.Key_T:
             print("pressT")
             self.doPress = True
-            self.robot.vr +=  5
-            self.robot.vl +=  5
+            self.robot.vr +=  0.25
+            self.robot.vl +=  0.25
 
         elif key == Qt.Key_G:
             print("pressG")
             self.doPress = True
-            self.robot.vr +=  -5
-            self.robot.vl +=  -5
+            self.robot.vr +=  -0.25
+            self.robot.vl +=  -0.25
 
         elif key == Qt.Key_X:
             print("pressX")
@@ -116,9 +120,16 @@ class MRS(QMainWindow):#(QWidget):#
             return None
 
         if self.doPress:
-            print("vl= " + str(self.robot.vl) + ",vr=" + str(self.robot.vr))
             self.doPress = False
-
+            '''
+            if not self.isCollided:
+                box = self.robot.clone(assignId=False)
+                #box.updateTransform(0.17)
+                if box.checkCollision(self.wallMid,doResponse=False):
+                    self.robot.vl=0
+                    self.robot.vr=0
+            '''
+            print("vl= " + str(self.robot.vl) + ",vr=" + str(self.robot.vr))
             #self.robot.updateTransform(1)
             #self.robot.updatePosition(1)
 
