@@ -89,13 +89,19 @@ class MRS(QMainWindow):#(QWidget):#
 
         self.isCollided = False
 
+        self.robot.sDistances = np.zeros((len(self.robot.sensors),))
+        #self.robot.checkCollision(self.walls[0])
         for wall in self.walls:
             temp = self.robot.checkCollision(wall)
             if self.isCollided == False:
                 self.isCollided = temp
 
+
+
         #if not self.isCollided:
         self.robot.updateTransform(dt)
+
+
 
         '''
         self.isCollided = False

@@ -45,11 +45,153 @@ class Robot(Object):
         self.theta = np.arccos(np.dot(self.forward, xAxes) / (
                     np.linalg.norm(self.forward) * np.linalg.norm(xAxes)))  # self.angle(self.forward,np.array([1,0]))
 
+        self.sThreshold = 100
+        self.updateSensors()
+        self.sDistances = np.zeros((len(self.sensors),))
+
     #angle between Ox and forward vector
+
+    def updateSensors(self):
+        xAxes = self.forward
+
+        self.sensors = []
+        offset= 30
+        for time in range(12):
+            angle = np.pi * (offset * time)/180
+            temp = np.array([np.cos(angle) * xAxes[0] - np.sin(angle) * xAxes[1],
+             np.sin(angle) * xAxes[0] + np.cos(angle) * xAxes[1],
+             ])
+            self.sensors.append(self.pos + temp*self.rsize[0]/2)
+
+
+
 
     def setPosition(self,x,y):
         self.pos = np.array([x,y])
 
+    def checkLinePoint(self,ps1,pe1,ps2,pe2):
+        A1 = pe1[1] - ps1[1]
+        B1 = ps1[0] - pe1[0]
+        A2 = pe2[1] - ps2[1]
+        B2 = ps2[0] - pe2[0]
+        delta = A1 * B2 - A2 * B1
+        if delta == 0: #parallel
+            return None
+        C2 = A2 * ps2[0] + B2 * ps2[1]
+        C1 = A1 * ps1[0] + B1 * ps1[1]
+        invdelta = 1. / delta
+
+        ret = [ (B2*C1 - B1*C2)*invdelta, (A1*C2 - A2*C1)*invdelta ]
+
+
+
+        return ret
+
+
+
+
+
+    def checkLineRect(self,p1,p2,rx,ry,rw,rh):
+        r1= [rx - rw/2,ry-rh/2]
+        r2= [rx + rw/2,ry-rh/2]
+        r3= [rx - rw/2,ry+rh/2]
+        r4= [rx + rw/2,ry+rh/2]
+
+        min_x = np.min([r1[0], r2[0], r3[0], r4[0]])
+        min_y = np.min([r1[1], r2[1], r3[1], r4[1]])
+        max_x = np.max([r1[0], r2[0], r3[0], r4[0]])
+        max_y = np.max([r1[1], r2[1], r3[1], r4[1]])
+
+        if ((p1[0] < min_x and p2[0] < min_x) or
+            (p1[1] > max_y and p2[1] > max_y) or
+            (p1[0] > max_x and p2[0] > max_x) or
+            (p1[1] < min_y and p2[1] < min_y)
+        ):
+            return None
+        if p2[0] < min_x:
+            if p2[1] > min_y and p2[1] < max_y:
+                if p1[0] > max_x:
+                    return self.checkLinePoint(p1, p2, [max_x, min_y], [max_x, max_y])
+                elif p1[1] > max_y:
+                    return self.checkLinePoint(p1, p2, [min_x, max_y], [max_x, max_y])
+                else:
+                    return self.checkLinePoint(p1, p2, [min_x, min_y], [max_x, min_y])
+
+            elif p2[1] < min_y:
+                if p1[0]>max_x:
+                    return self.checkLinePoint(p1, p2, [max_x, min_y], [max_x, max_y])
+                else:
+                    return self.checkLinePoint(p1, p2, [min_x, max_y], [max_x, max_y])
+
+            else:
+                if p1[0]>max_x:
+                    return self.checkLinePoint(p1, p2, [max_x, min_y], [max_x, max_y])
+                else:
+                    return self.checkLinePoint(p1, p2, [min_x, min_y], [max_x, min_y])
+        elif p2[0] > max_x:
+            if p2[1] > min_y and p2[1] < max_y:
+                if p1[0] < min_x:
+                    return self.checkLinePoint(p1, p2, [min_x, min_y], [min_x, max_y])
+                elif p1[1] > max_y:
+                    return self.checkLinePoint(p1, p2, [min_x, max_y], [max_x, max_y])
+                else:
+                    return self.checkLinePoint(p1, p2, [min_x, min_y], [max_x, min_y])
+            elif p2[1] < min_y:
+                if p1[0]< min_x:
+                    return self.checkLinePoint(p1, p2, [min_x, min_y], [min_x, max_y])
+                else:
+                    return self.checkLinePoint(p1, p2, [min_x, max_y], [max_x, max_y])
+            else:
+                if p1[0]< min_x:
+                    return self.checkLinePoint(p1, p2, [min_x, min_y], [min_x, max_y])
+                else:
+                    return self.checkLinePoint(p1, p2, [min_x, min_y], [max_x, min_y])
+        else:
+            if p2[1] < min_y:
+                if p1[0] < min_x:
+                    return self.checkLinePoint(p1, p2, [min_x, min_y], [min_x, max_y])
+                elif p1[0]>max_x:
+                    return self.checkLinePoint(p1, p2, [max_x, max_y], [max_x, max_y])
+                else:
+                    return self.checkLinePoint(p1, p2, [min_x, max_y], [max_x, max_y])
+            if (p2[1] > max_y):
+                if p1[0] < min_x:
+                    return self.checkLinePoint(p1, p2, [min_x, min_y], [min_x, max_y])
+                elif p1[0]>max_x:
+                    return self.checkLinePoint(p1, p2, [max_x, min_y], [max_x, max_y])
+                else:
+                    return self.checkLinePoint(p1, p2, [min_x, min_x], [max_x, min_y])
+            else:
+                if p1[0]<min_x:
+                    return self.checkLinePoint(p1, p2, [min_x, min_y], [min_x, max_y])
+                elif p1[0]>max_x:
+                    return self.checkLinePoint(p1, p2, [max_x, min_y], [max_x, max_y])
+                if p1[1]<min_y:
+                    return self.checkLinePoint(p1, p2, [min_x, min_y], [max_x, min_y])
+                elif p1[1]>max_y:
+                    return self.checkLinePoint(p1, p2, [min_x, max_y], [max_x, max_y])
+
+
+        return None
+
+
+    def checkCollision(self, other, doResponse=True):
+
+        for i,sensor in enumerate(self.sensors) :
+            norVec = Utils.normalizeByDivideNorm(sensor-self.pos)
+
+            contractPoint = self.checkLineRect(sensor, sensor+norVec*self.sThreshold, other.pos[0], other.pos[1],
+                                                                  other.rsize[0], other.rsize[1])
+
+            if contractPoint != None:
+                if not ( contractPoint[0] < other.pos[0]-other.rsize[0]/2 or   contractPoint[0] > other.pos[0]+other.rsize[0]/2 or
+                        contractPoint[1] < other.pos[1]-other.rsize[1] / 2 or contractPoint[1] > other.pos[1]+other.rsize[1] / 2
+                ):
+                    self.sDistances[i] = np.linalg.norm(contractPoint-sensor)# np.array([contractPoint])
+
+
+
+        return super(Robot,self).checkCollision(other,doResponse)
 
 
     def onCollisionWith(self, obj, normalX, normalY, contractPoint):
@@ -90,8 +232,8 @@ class Robot(Object):
                        np.linalg.norm(self.forward) * np.linalg.norm(np.array([1, 0]))))  # self.angle(self.forward,np.array([1,0]))
             '''
         else:
-            nx = self.pos[0] - self.point[0]
-            ny = self.pos[1] - self.point[1]
+            nx = self.pos[0] -contractPoint[0] #self.point[0]
+            ny = self.pos[1] - contractPoint[1] #self.point[1]
 
             n = np.array([nx,ny])
             n = Utils.normalizeByDivideNorm(n)
@@ -169,6 +311,8 @@ class Robot(Object):
             self.ICC = self.pos
             self.pos = self.pos + f * (self.vl+self.vr)/2
 
+
+        self.updateSensors()
         return True
 
     def clone(self,assignId=False ):
@@ -283,9 +427,9 @@ class Robot(Object):
         qp.drawPoint(self.point[0],self.point[1])
 
 
-        pen = QPen(Qt.black, 10, Qt.SolidLine)
-        qp.setPen(pen)
-        qp.drawLine(self.point[0],self.point[1],self.point[0]+self.normal[0],self.point[1]+self.normal[1])
+        #pen = QPen(Qt.black, 10, Qt.SolidLine)
+        #qp.setPen(pen)
+        #qp.drawLine(self.point[0],self.point[1],self.point[0]+self.normal[0],self.point[1]+self.normal[1])
 
         pen = QPen(Qt.black, 10, Qt.SolidLine)
         qp.setPen(pen)
@@ -307,6 +451,20 @@ class Robot(Object):
 
         # qp.drawPoint(textPos[0], textPos[1])
         qp.drawText(QPointF(rightTextPos[0], rightTextPos[1]), str(self.vr))
+
+
+
+        for i,sensor in enumerate(self.sensors) :
+            pen6 = QPen(Qt.darkCyan, 0.01, Qt.SolidLine)
+            qp.setPen(pen6)
+            norVec = Utils.normalizeByDivideNorm(sensor - self.pos) *self.sThreshold
+            qp.drawText(QPointF(sensor[0] +norVec[0], sensor[1]+norVec[1]), str("{:.1f}".format(self.sDistances[i])))
+
+            #pen6 = QPen(Qt.darkCyan, 6, Qt.SolidLine)
+            #qp.setPen(pen6)
+            #qp.drawLine(sensor[0], sensor[1], sensor[0] + norVec[0], sensor[1] + norVec[1])
+
+            #qp.drawLine(sensor[0], sensor[1], self.sDistances[i][0],self.sDistances[i][1])
 
         '''
         pen6 = QPen(Qt.darkBlue, 1.5, Qt.SolidLine)

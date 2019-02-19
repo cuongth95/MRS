@@ -126,7 +126,7 @@ class Object:#(QtWidgets.QWidget):
             return entryTime,normalx,normaly
 
 
-
+    @abc.abstractmethod
     def checkCollision(self,other,doResponse=True):
         isCollision,normal,contractPoint = self.quickCheck2(self, other)
         if isCollision and doResponse:
@@ -234,5 +234,4 @@ class Object:#(QtWidgets.QWidget):
                 return True,np.array([normalx,normaly]),np.array([0,0]),(a.pos + b.pos)/2
 
         return False,np.array([0,0]),np.array([0,0])
-
 
