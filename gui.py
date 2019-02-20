@@ -45,6 +45,7 @@ class MRS(QMainWindow):#(QWidget):#
         self.doPress = False
         self.isCollided = False
         self.timer = QBasicTimer()
+        self.prevPos = self.robot.pos
 
     def getCenter(self):
         return (self.screenWidth/2,self.screenHeight/2)
@@ -85,21 +86,23 @@ class MRS(QMainWindow):#(QWidget):#
                     break
         '''
         #if not self.isCollided:
-        prevPos = self.robot.pos
 
+        self.robot.updateTransform(dt)
         self.isCollided = False
 
         self.robot.sDistances = np.zeros((len(self.robot.sensors),))
         #self.robot.checkCollision(self.walls[0])
         for wall in self.walls:
-            temp = self.robot.checkCollision(wall)
+            temp = self.robot.checkCollision(wall,True)
             if self.isCollided == False:
                 self.isCollided = temp
 
+        if self.isCollided:
+            self.robot.pos = self.prevPos
 
+        self.prevPos = self.robot.pos
 
         #if not self.isCollided:
-        self.robot.updateTransform(dt)
 
 
 
@@ -117,6 +120,7 @@ class MRS(QMainWindow):#(QWidget):#
 
     def keyPressEvent(self, event):
         key = event.key()
+
         prevVl = self.robot.vl
         prevVr = self.robot.vr
         if key == Qt.Key_W:
@@ -161,6 +165,7 @@ class MRS(QMainWindow):#(QWidget):#
 
         if self.doPress:
             self.doPress = False
+
             '''
             if not self.isCollided:
                 box = self.robot.clone(assignId=False)

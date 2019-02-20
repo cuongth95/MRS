@@ -130,22 +130,8 @@ class Object:#(QtWidgets.QWidget):
     def checkCollision(self,other,doResponse=True):
         isCollision,normal,contractPoint = self.quickCheck2(self, other)
         if isCollision and doResponse:
-            #print("collided")
-            #collideTime,normalX,normalY = self.AABB(other)
-            #friction here- but i dont use
-
-            '''
-            if collideTime < 1:
-                self.onCollisionWith(other,normalX,normalY,collideTime)
-                other.onCollisionWith(self, normalX, normalY, collideTime)
-                isCollision =True
-                print("collided")
-            '''
             self.onCollisionWith(other, normal[0], normal[1], contractPoint)
             other.onCollisionWith(self, -normal[0],-normal[1] , contractPoint)
-            #self.onCollisionWith2(other)
-            #other.onCollisionWith2(self)
-            #isCollision = True
 
 
         return isCollision

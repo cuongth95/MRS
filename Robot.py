@@ -176,7 +176,7 @@ class Robot(Object):
 
 
     def checkCollision(self, other, doResponse=True):
-
+        '''
         for i,sensor in enumerate(self.sensors) :
             norVec = Utils.normalizeByDivideNorm(sensor-self.pos)
 
@@ -190,63 +190,58 @@ class Robot(Object):
                     self.sDistances[i] = np.linalg.norm(contractPoint-sensor)# np.array([contractPoint])
 
 
-
+        '''
         return super(Robot,self).checkCollision(other,doResponse)
 
 
     def onCollisionWith(self, obj, normalX, normalY, contractPoint):
 
-        #remainTime = 1 - colTime
-        #magnitude = self.getVelocity() * remainTime
-        print("normalX ="+str(normalX) +",normalY="+str(normalY))
-        #if normalX != 0 and normalY != 0:
-        #    normalX = 0
-        if normalX == 0 or normalY ==0:
-            if normalX == -1: #  left of obj
-                self.pos[0] =(contractPoint[0]-self.rsize[0]/2 - 0.1)#(obj.pos[0]-obj.rsize[0]/2-self.rsize[0]/2 - 0.1) #
-            elif normalX == 1:  # right of obj
-                self.pos[0] = (contractPoint[0]+self.rsize[0]/2 + 0.1)#(obj.pos[0]+obj.rsize[0]/2+self.rsize[0]/2 + 0.1) #
-            if normalY == 1:  # bot of obj
-                self.pos[1] =(contractPoint[1]+ self.rsize[0] / 2 + 0.1)# (obj.pos[1] + obj.rsize[1] / 2 + self.rsize[0] / 2 + 0.1) #
-            elif normalY == -1:  # top of obj
-                self.pos[1] = (contractPoint[1]- self.rsize[0] / 2 - 0.1)#(obj.pos[1] - obj.rsize[1] / 2 - self.rsize[0] / 2 - 0.1) #
-
-            planeVec = np.array([normalY,-normalX])
-            slidingVec = np.multiply(self.forward,planeVec)/ (planeVec[0]**2+planeVec[1]**2) * planeVec
-            if slidingVec[0] == 0 and slidingVec[0] == 0:
-                self.vl = self.vr = 0
-            else:
-                self.forward =slidingVec
-                self.theta = np.arccos(np.dot(self.forward, np.array([1, 0])) / (
-                    np.linalg.norm(self.forward) * np.linalg.norm(np.array([1, 0]))))  # self.angle(self.forward,np.array([1,0]))
-            '''
-            reverseNormal = np.array([-normalX, -normalY])
-            slidingVec = self.forward - reverseNormal
-            slidingVec = np.array([normalY,-normalX])
-            if np.all(slidingVec == 0):
-                self.vl = self.vr = 0
-            else:
-                slidingVec = Utils.normalizeByDivideNorm(slidingVec)
-                self.forward = -slidingVec
-                self.theta = np.arccos(np.dot(self.forward, np.array([1,0])) / (
-                       np.linalg.norm(self.forward) * np.linalg.norm(np.array([1, 0]))))  # self.angle(self.forward,np.array([1,0]))
-            '''
+        projection = np.array([0,0])
+        if normalX !=0 and normalY !=0:
+            vec = np.array([0,0])
+            self.vl = self.vr = 0
+            return True
         else:
-            nx = self.pos[0] -contractPoint[0] #self.point[0]
-            ny = self.pos[1] - contractPoint[1] #self.point[1]
+            if normalX !=0:
+                if normalX > 0:
+                    vec = np.array([0,-1])
+                else:
+                    vec = np.array([0,1])
+            else:
+                if normalY > 0:
+                    vec = np.array([-1,0])
+                else:
+                    vec = np.array([1,0])
 
-            n = np.array([nx,ny])
-            n = Utils.normalizeByDivideNorm(n)
-
-            #projection = self.forward[0] * nx + self.forward[1] * ny
-            self.pos = contractPoint + n*(self.rsize[0]/2 +0.1)
-            #self.forward = np.array([nx, ny])
-            #self.theta = np.arccos(np.dot(self.forward, np.array([1, 0])) / (
-            #        np.linalg.norm(self.forward) * np.linalg.norm(
-            #    np.array([1, 0]))))  # self.angle(self.forward,np.array([1,0]))
+        planeVec = vec
+        projection = np.multiply(self.forward, planeVec) / (planeVec[0] ** 2 + planeVec[1] ** 2) * planeVec
 
 
-        #self.vl = self.vr = 0
+        if projection[0] !=0:
+             if projection[0] >0:
+                 vec = np.array([ 1,0 ])
+             else:
+                 vec = np.array([ -1,0 ])
+        else:
+             if projection[1] >0:
+                 vec = np.array([ 0,1 ])
+             else:
+                 vec = np.array([ 0,-1 ])
+
+        n =  Utils.normalizeByDivideNorm(contractPoint - self.pos)
+
+
+        self.forward = Utils.normalizeByDivideNorm(vec)
+        lastTheta= np.rad2deg(self.theta)
+        self.theta = np.arccos(np.dot(self.forward, np.array([1, 0])) / (
+                np.linalg.norm(self.forward)*np.linalg.norm(np.array([1, 0]))))  # self.angle(self.forward,np.array([1,0]))
+
+        temTheta = np.rad2deg(self.theta)
+
+        if lastTheta <0:
+             self.theta = -self.theta
+
+
         return True
 
 
@@ -329,61 +324,6 @@ class Robot(Object):
         cloner.R = self.R
         cloner.l = self.l
         return cloner
-
-
-    '''
-    def updatePosition(self,dt):
-        delta = self.vr - self.vl#np.linalg.norm( self.vr - self.vl)
-
-        if delta !=0 :
-            #print("inside")
-            xAxes =np.array([1,0])
-            temp =  np.arccos(np.dot(self.forward, xAxes) / (np.linalg.norm(self.forward) * np.linalg.norm(xAxes)))# self.angle(self.forward,np.array([1,0]))
-
-
-            self.rotation = delta / self.l
-            #self.R = self.l / 2 * np.linalg.norm(self.vl + self.vr) / np.linalg.norm(self.vr - self.vl)
-            self.R = self.l * (self.vl + self.vr) / (2*delta)
-
-            print("theta= "+str(temp))
-            print("rotation= "+str(self.rotation))
-            print("R= "+str(self.R))
-            self.ICC = np.array([self.pos[0] - self.R *np.sin(temp), self.pos[1] + self.R *np.cos(temp)])
-            newPos,theta= self.rotate(dt)
-
-            self.pos = newPos
-
-            #self.forward = ( (self.vr + self.vl) / 2)
-            #self.forward = self.forward/np.linalg.norm(self.forward)
-            #self.forward *= np.array([xAxes[0] - np.sin(theta), xAxes[1] + self.R *np.cos(theta)])
-            #self.forward = Utils.normalize(self.forward)
-            #self.forward[0] =  xAxes[0] * np.cos(theta) - xAxes[1] * np.sin(theta)
-            #self.forward[1] = xAxes[0] * np.sin(theta) + xAxes[1] * np.cos(theta)
-            #np.cos(theta) = np.dot(self.forward, xAxes)
-            print("f = "+str( self.forward)+",new theta="+str(theta))
-            print(self.pos)
-        else:
-            print("outside")
-            self.pos = self.pos + self.forward
-
-
-
-
-    def rotate(self,dt):
-        xAxes =np.array([1,0])
-        theta = np.arccos(np.dot(self.forward, xAxes) / (np.linalg.norm(self.forward) * np.linalg.norm(xAxes)))# self.angle(self.forward,np.array([1,0]))
-        odt = self.rotation * dt
-        rotationMat = np.array([[np.cos(odt),-np.sin(odt),0]
-                               ,[np.sin(odt),np.cos(odt),0]
-                               ,[0,0,1]])
-        m2 = np.array([ self.pos[0] -  self.ICC[0],  self.pos[1] -  self.ICC[1],  theta])
-        m3 = np.array([ self.ICC[0], self.ICC[1], odt])
-
-        ret = np.dot(rotationMat,m2)+m3
-        newPos = np.array([ret[0],ret[1]])
-        theta = ret[2]
-        return newPos,theta
-    '''
 
     def setDistanceBetweenWheelAndOrigin(self,value):
         if(value >0 and value < self.radius):

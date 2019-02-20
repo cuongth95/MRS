@@ -7,7 +7,9 @@ def normalizeByDivideNorm(vec):
     if norm != 0:
         vecN[0] /= norm
         vecN[1] /= norm
-    return vecN
+        return vecN
+    else:
+        return vec
 
 def normalize(vec):
     vecN = np.array([0,0])
