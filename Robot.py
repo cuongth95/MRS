@@ -8,6 +8,7 @@ from PyQt5.QtCore import Qt, QBasicTimer, pyqtSignal
 from PyQt5.QtGui import QPainter, QColor
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
+from numpy.doc import internals
 
 import Utils
 import numpy as np
@@ -45,7 +46,7 @@ class Robot(Object):
         self.theta = np.arccos(np.dot(self.forward, xAxes) / (
                     np.linalg.norm(self.forward) * np.linalg.norm(xAxes)))  # self.angle(self.forward,np.array([1,0]))
 
-        self.sThreshold = 100
+        self.sThreshold = 200
         self.updateSensors()
         self.sDistances = np.zeros((len(self.sensors),))
 
@@ -75,20 +76,39 @@ class Robot(Object):
         A2 = pe2[1] - ps2[1]
         B2 = ps2[0] - pe2[0]
         delta = A1 * B2 - A2 * B1
-        if delta == 0: #parallel
+        if delta <= 0 or delta > np.linalg.norm(pe1-ps1): #parallel
             return None
+
         C2 = A2 * ps2[0] + B2 * ps2[1]
         C1 = A1 * ps1[0] + B1 * ps1[1]
         invdelta = 1. / delta
 
         ret = [ (B2*C1 - B1*C2)*invdelta, (A1*C2 - A2*C1)*invdelta ]
-
-
+        #ret = [(B2 * C1 ) * invdelta, (A1 * C2 ) * invdelta]
 
         return ret
 
+    def checkLinePoint3(self,a1,a2,b1,b2):
+        intersection= np.array([0,0])
 
+        b = a2-a1
+        d = b2-b1
 
+        dot = b[0]*d[1]-b[1]*d[0]
+        if dot ==0:
+            return None
+
+        c = b1-a1
+        t= (c[0]*d[1]-c[1]*d[0]) / dot
+        if t<0 or t>1:
+            return None
+
+        u = (c[0]*b[1]-c[1]*b[0])/dot
+        if u<0 or u>1:
+            return None
+
+        intersection = a1 + t * b
+        return [intersection[0],intersection[1]]
 
 
     def checkLineRect(self,p1,p2,rx,ry,rw,rh):
@@ -175,22 +195,80 @@ class Robot(Object):
         return None
 
 
+
+
+    def onRect(self,ret,rtl,rbr):
+        return  not(ret[0] <rtl[0] or ret[0] > rbr[0] or
+                ret[1] < rtl[1] or ret[1] > rbr[1]
+        )
+
+
+    def checkLineRect2(self,ps,pe,rx,ry,rw,rh):
+        rtl = np.array([rx - rw / 2, ry - rh / 2])
+        rtr = np.array([rx + rw / 2, ry - rh / 2])
+        rbl = np.array([rx - rw / 2, ry + rh / 2])
+        rbr = np.array([rx + rw / 2, ry + rh / 2])
+
+        denoms = []
+        top = self.checkLinePoint3(ps,pe,rtl,rtr)
+        if top !=None:
+            #if self.onRect(top,rtl,rbr):
+                denoms.append(top)
+
+        right = self.checkLinePoint3(ps, pe, rtr, rbr)
+        if right !=None:
+            #if self.onRect(right, rtl, rbr):
+                denoms.append(right)
+
+        bot =self.checkLinePoint3(ps, pe, rbr, rbl)
+        if bot !=None:
+            #if self.onRect(bot, rtl, rbr):
+                denoms.append(bot)
+
+        left =self.checkLinePoint3(ps, pe, rbl, rtl)
+        if left !=None:
+            if self.onRect(left, rtl, rbr):
+                denoms.append(left)
+
+        if len(denoms)==0:
+            return False,np.zeros((2,))
+        else:
+            points = np.copy(denoms)
+            dist = np.linalg.norm(points-ps)
+            minIndex = np.argmin(dist)
+            return True,points[minIndex]
+
+
+
+
     def checkCollision(self, other, doResponse=True):
-        '''
-        for i,sensor in enumerate(self.sensors) :
-            norVec = Utils.normalizeByDivideNorm(sensor-self.pos)
 
-            contractPoint = self.checkLineRect(sensor, sensor+norVec*self.sThreshold, other.pos[0], other.pos[1],
-                                                                  other.rsize[0], other.rsize[1])
+        if doResponse:
 
-            if contractPoint != None:
-                if not ( contractPoint[0] < other.pos[0]-other.rsize[0]/2 or   contractPoint[0] > other.pos[0]+other.rsize[0]/2 or
-                        contractPoint[1] < other.pos[1]-other.rsize[1] / 2 or contractPoint[1] > other.pos[1]+other.rsize[1] / 2
-                ):
-                    self.sDistances[i] = np.linalg.norm(contractPoint-sensor)# np.array([contractPoint])
+            for i,sensor in enumerate(self.sensors) :
+
+                norVec = Utils.normalizeByDivideNorm(sensor-self.pos)
+                sensorThreshold = sensor+norVec*self.sThreshold
+
+                doActive,contractPoint = self.checkLineRect2(sensor,sensorThreshold, other.pos[0], other.pos[1],
+                                                   other.rsize[0], other.rsize[1])
+                if doActive:
+                    self.sDistances[i] = np.linalg.norm(contractPoint-sensor)
+                '''
+                norVec = Utils.normalizeByDivideNorm(sensor-self.pos)
+    
+                contractPoint = self.checkLineRect(sensor, sensor+norVec*self.sThreshold, other.pos[0], other.pos[1],
+                                                                      other.rsize[0], other.rsize[1])
+    
+                if contractPoint != None:
+                    if not ( contractPoint[0] < other.pos[0]-other.rsize[0]/2 or   contractPoint[0] > other.pos[0]+other.rsize[0]/2 or
+                            contractPoint[1] < other.pos[1]-other.rsize[1] / 2 or contractPoint[1] > other.pos[1]+other.rsize[1] / 2
+                    ):
+                        self.sDistances[i] = np.linalg.norm(contractPoint-sensor)# np.array([contractPoint])
+                '''
 
 
-        '''
+
         return super(Robot,self).checkCollision(other,doResponse)
 
 
@@ -395,74 +473,21 @@ class Robot(Object):
 
 
         for i,sensor in enumerate(self.sensors) :
+            #pen6 = QPen(Qt.darkCyan, 0.01, Qt.SolidLine)
             pen6 = QPen(Qt.darkCyan, 0.01, Qt.SolidLine)
             qp.setPen(pen6)
             norVec = Utils.normalizeByDivideNorm(sensor - self.pos) *self.sThreshold
             qp.drawText(QPointF(sensor[0] +norVec[0], sensor[1]+norVec[1]), str("{:.1f}".format(self.sDistances[i])))
-
+            #qp.drawText(QPointF(sensor[0] + norVec[0], sensor[1] + norVec[1]), str(self.sDistances[i]))
+            #qp.drawPoint(self.sDistances[i][0],self.sDistances[i][1])
             #pen6 = QPen(Qt.darkCyan, 6, Qt.SolidLine)
+            #qp.setPen(pen6)
+
+            #pen6 = QPen(Qt.darkCyan, 1, Qt.SolidLine)
             #qp.setPen(pen6)
             #qp.drawLine(sensor[0], sensor[1], sensor[0] + norVec[0], sensor[1] + norVec[1])
 
             #qp.drawLine(sensor[0], sensor[1], self.sDistances[i][0],self.sDistances[i][1])
 
-        '''
-        pen6 = QPen(Qt.darkBlue, 1.5, Qt.SolidLine)
-        qp.setPen(pen6)
-        qp.drawLine(self.pos[0], self.pos[1], self.point[0],self.point[1])
 
-        pen6 = QPen(Qt.darkBlue, 1.5, Qt.SolidLine)
-        qp.setPen(pen6)
-        qp.drawLine(self.pos[0], self.pos[1], self.point[0],self.point[1])
-        
-        pen3 = QPen(Qt.blue, 0.5, Qt.SolidLine)
-        qp.setPen(pen3)
-        qp.drawLine(55, 50, 75, 50)
-        #right wheel
-        pen4 = QPen(Qt.black, 0.5, Qt.SolidLine)
-        qp.setPen(pen4)
-        qp.drawLine(55, 80, 75, 80)
-        '''
         return True
-
-    '''
-    def paintEvent(self,event):
-        print("updating render")
-        painter = QPainter(self)
-        painter.setBrush(Qt.blue)
-        # body
-        #pen = QPen(Qt.red, 1.5, Qt.SolidLine)
-        #painter.setPen(pen)
-        painter.drawPie(QRectF(self.pos[0], self.pos[1], self.size, self.size), 0, 5760)
-        #painter.drawEllipse(self.pos[0], self.pos[1], self.size, self.size)
-        # forward
-        origin = self.pos + self.size / 2
-        #pen2 = QPen(Qt.red, 0.5, Qt.SolidLine)
-        #painter.setPen(pen2)
-        painter.drawLine(origin[0], origin[1], origin[0] + self.forward[0], origin[1] + self.forward[1])
-
-        # ICC debug
-        #pen3 = QPen(Qt.blue, 1.5, Qt.SolidLine)
-        #painter.setPen(pen3)
-        painter.drawEllipse(self.ICC[0], self.ICC[1], self.size / 3, self.size / 3)
-
-
-
-        # painter.translate(0, self.rect().height())
-        #print(str(self.x) + "," + str(self.y))
-        #print("shape = "+str(self.pos.shape))
-
-        #origin = np.array([self.pos[0]-self.size/2, self.pos[1]-self.size/2])
-
-        #painter.drawPie(QtCore.QRectF(origin[0], origin[1],self.size,self.size),0, 5760)
-        #painter.drawPie(QtCore.QRectF(self.pos[0], self.pos[1],self.size,self.size),0, 5760)
-        #painter.setBrush(QtCore.Qt.red)
-        #painter.drawLine(QtCore.QLineF(self.pos[0],self.pos[1],self.pos[0]+self.forward[0]*100,self.pos[1]+self.forward[1]*100))
-
-
-        #painter.drawPie(QtCore.QRectF(self.ICC[0], self.ICC[1], self.size/3, self.size/3), 0, 5760)
-
-        #painter.(QtCore.QPointF(self.ICC[0],self.ICC[1]))
-        # painter.rotate(-self.currentAngle)
-        # painter.drawRect(QtCore.QRect(33, -4, 15, 8))
-    '''

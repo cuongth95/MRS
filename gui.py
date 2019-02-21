@@ -72,20 +72,6 @@ class MRS(QMainWindow):#(QWidget):#
         self.timer.start(17,self)
 
     def updateLogic(self,dt):
-        #print("dt="+str(dt))
-
-
-        '''
-        if self.isCollided == False:
-            box = self.robot.clone(assignId=False)
-            box.pos = np.array(
-                [self.robot.pos[0] + self.robot.getVelocity()[0], self.robot.pos[1] + self.robot.getVelocity()[1]])
-            for wall in self.walls:
-                if  box.checkCollision(wall):
-                    self.isCollided = True
-                    break
-        '''
-        #if not self.isCollided:
 
         self.robot.updateTransform(dt)
         self.isCollided = False
@@ -277,4 +263,5 @@ if __name__ == '__main__':
 
     app = QApplication([])
     game = MRS()
+
     sys.exit(app.exec_())
