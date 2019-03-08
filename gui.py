@@ -13,7 +13,9 @@ from PyQt5.QtCore import *
 from Robot import Robot
 from Wall import  Wall
 from Object import Object
+import Evolution
 import numpy as np
+
 
 class MRS(QMainWindow):#(QWidget):#
 
@@ -21,12 +23,19 @@ class MRS(QMainWindow):#(QWidget):#
     screenHeight= 720
 
     def __init__(self):
+        self.frameRate = 60
         #QWidget.__init__(self, None)
         super(MRS, self).__init__()
         self.initGame()
         self.initUI()
 
     def initGame(self):
+        self.cminY = np.zeros(2)
+        self.cmaxY = np.zeros(2)
+        self.cminX = np.zeros(2)
+        self.cmaxX = np.zeros(2)
+
+        self.box = None
         self.walls = []
         self.robot = Robot()
         #self.wallLeft = Wall()
@@ -47,6 +56,15 @@ class MRS(QMainWindow):#(QWidget):#
         self.timer = QBasicTimer()
         self.prevPos = self.robot.pos
 
+        self.robot.updateSensors()
+        self.robot.sDistances = np.zeros(len(self.robot.sensors))
+        for wall in self.walls:
+            self.robot.updateSensorInfo(self.robot.pos, wall)
+
+        self.ea = Evolution.Evolution(self,[500,500],200)
+
+
+
     def getCenter(self):
         return (self.screenWidth/2,self.screenHeight/2)
 
@@ -56,10 +74,8 @@ class MRS(QMainWindow):#(QWidget):#
         #self.tboard = Board(self)
         #self.setCentralWidget(self.tboard)
         #self.statusbar = self.statusBar()   self.tboard.msg2Statusbar[str].connect(self.statusbar.showMessage)
-        
-        horizontalLayout = QHBoxLayout(self)
-        verticalLayout = QVBoxLayout(self)
-        verticalLayout.addLayout(horizontalLayout)
+
+        verticalLayout = QVBoxLayout()
         #verticalLayout.addWidget(self.robot)
         self.setLayout(verticalLayout)
         self.resize(1080, 720)
@@ -69,40 +85,63 @@ class MRS(QMainWindow):#(QWidget):#
         #self.worker = Worker(self)
         #self.worker.start()
         self.lastFrameTime = time.time()
-        self.timer.start(17,self)
+
+        self.timer.start(1000.0/60,self)
+
+    def checkCollision(self,r,doResponse=True):
+        collideFlag = False
+
+        ##if r.pos[0] <0-50 or r.pos[0] > self.screenWidth+50 or r.pos[1]<0-50 or r.pos[1] > self.screenHeight+50:
+        #    print("quach thi phung")
+        for wall in self.walls:
+            temp = r.checkCollision(wall,doResponse)
+            if collideFlag == False:
+                collideFlag = temp
+
+        return collideFlag
+
+
 
     def updateLogic(self,dt):
 
-        self.robot.updateTransform(dt)
-        self.isCollided = False
+        self.frameRate = dt * 1000
 
-        self.robot.sDistances = np.zeros((len(self.robot.sensors),))
-        #self.robot.checkCollision(self.walls[0])
-        for wall in self.walls:
-            temp = self.robot.checkCollision(wall,True)
-            if self.isCollided == False:
-                self.isCollided = temp
-
-        if self.isCollided:
-            self.robot.pos = self.prevPos
-
-        self.prevPos = self.robot.pos
-
-        #if not self.isCollided:
-
-
-
+        #self.robot.vl=self.robot.vr = 25
+        #self.robot.pos = np.array([1020,500])
         '''
+        if not self.isCollided:
+            tempPos = self.robot.updateTransform(dt)
+        else:
+            tempPos = np.copy(self.robot.pos)
+
+        #tempPos = np.array([1056.009,500])
         self.isCollided = False
         for wall in self.walls:
-            if self.robot.checkCollision(wall,doResponse=False):
-                self.isCollided = True
-                break
+            flag = self.robot.checkCollisionWithNewPos(tempPos,wall)
+            if not self.isCollided:
+                self.isCollided = flag
 
-        if self.isCollided:
-            self.robot.pos= prevPos
+
+        if not self.isCollided:
+            self.robot.pos = tempPos
+
+        if self.robot.prevPos[0] != self.robot.pos[0] or self.robot.prevPos[1] != self.robot.pos[1]:
+            self.robot.updateSensors()
+            self.robot.sDistances = np.zeros(len(self.robot.sensors))
+            for wall in self.walls:
+                self.robot.updateSensorInfo(self.robot.pos, wall)
+
+
+       
+        #self.robot.sDistances = np.zeros(len(self.robot.sensors))
         '''
+
+        self.ea.updateLogic(dt)
         return True
+
+
+
+
 
     def keyPressEvent(self, event):
         key = event.key()
@@ -128,14 +167,14 @@ class MRS(QMainWindow):#(QWidget):#
         elif key == Qt.Key_T:
             print("pressT")
             self.doPress = True
-            self.robot.vr +=  0.25
-            self.robot.vl +=  0.25
+            self.robot.vr += 5
+            self.robot.vl += 5
 
         elif key == Qt.Key_G:
             print("pressG")
             self.doPress = True
-            self.robot.vr +=  -0.25
-            self.robot.vl +=  -0.25
+            self.robot.vr +=  -5
+            self.robot.vl +=  -5
 
         elif key == Qt.Key_X:
             print("pressX")
@@ -145,8 +184,7 @@ class MRS(QMainWindow):#(QWidget):#
 
         if key == Qt.Key_C:
             self.robot.setPosition(500,500)
-            self.robot.forward = np.array([1.,0.])
-            self.robot.theta =0
+            self.robot.Reset()
             return None
 
         if self.doPress:
@@ -173,47 +211,32 @@ class MRS(QMainWindow):#(QWidget):#
         qp = QPainter()
         qp.begin(self)
 
+
+
         #self.drawLines(qp)
-        self.robot.draw(qp)
+
+        #origin = np.array([self.tempPos[0] - self.robot.rsize[0], self.tempPos[1] -  self.robot.rsize[0]])
+        pen = QPen(Qt.green, 3.5, Qt.SolidLine)
+        qp.setPen(pen)
+        #qp.drawLine(self.robot.pos[0],self.robot.pos[1] ,self.robot.pos[0]+self.tempPos[0]*100,self.robot.pos[1]+self.tempPos[1]*100)
+        #qp.drawLine(self.cminX[0], self.cminX[1], self.cmaxX[0], self.cmaxX[1])
+
+        #qp.drawLine(self.cminY[0], self.cminY[1], self.cmaxY[0], self.cmaxY[1])
+        #print("robotpos = "+str(self.robot.pos))
+        #self.robot.draw(qp)
+
+        self.ea.draw(qp)
+
         for wall in self.walls:
             wall.draw(qp)
         #self.wallMid.draw(qp)
         #self.drawRobot(qp)
+
+        pen = QPen(Qt.black, 5, Qt.SolidLine)
+        qp.setPen(pen)
+        qp.drawText(QPointF(100, 250), "Frame rate: " + str("{:.2f}".format(self.frameRate)))
         qp.end()
         
-        
-    def drawLines(self, qp):
-      
-        pen = QPen(Qt.black, 1.5, Qt.SolidLine)
-        qp.setPen(pen)
-        qp.drawRect(4,4,550,450)
-
-        pen2 = QPen(Qt.black, 1, Qt.SolidLine)
-        qp.setPen(pen2)
-        qp.drawRect(200,210,80,60)
-
-    def drawRobot(self, qp):
-      
-        pen = QPen(Qt.red, 1.5, Qt.SolidLine)
-        qp.setPen(pen)
-        qp.drawEllipse(40,40,50,50)
-        pen2 = QPen(Qt.red, 0.5, Qt.SolidLine)
-        qp.setPen(pen2)
-        qp.drawLine(90,65,60,65)
-        pen3 = QPen(Qt.blue, 0.5, Qt.SolidLine)
-        qp.setPen(pen3)
-        qp.drawLine(55,50,75,50)
-        pen4 = QPen(Qt.black, 0.5, Qt.SolidLine)
-        qp.setPen(pen4)
-        qp.drawLine(55,80,75,80)
-
-    #def center(self):
-        #'''centers the window on the screen'''
-        
-        #screen = QDesktopWidget().screenGeometry()
-        #size = self.geometry()
-        #self.move((screen.width()-size.width())/2, 
-            #(screen.height()-size.height())/2)
 
     def timerEvent(self, event):
         if event.timerId() == self.timer.timerId():

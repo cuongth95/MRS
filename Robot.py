@@ -1,18 +1,13 @@
 
-from PyQt5.QtWidgets import QMainWindow, QFrame, QDesktopWidget, QApplication
-from PyQt5.QtWidgets import (QApplication, QComboBox, QDialog,
-QDialogButtonBox, QFormLayout, QGridLayout, QGroupBox, QHBoxLayout,
-QLabel, QLineEdit, QMenu, QMenuBar, QPushButton, QSpinBox, QTextEdit,
-QVBoxLayout)
-from PyQt5.QtCore import Qt, QBasicTimer, pyqtSignal
-from PyQt5.QtGui import QPainter, QColor
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
-from numpy.doc import internals
-
+from collections import namedtuple
 import Utils
 import numpy as np
 from Object import Object
+'''
+@author Truong Huy Cuong
+'''
 class Robot(Object):
     def angle(v1, v2):
         angle = np.arccos(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)))
@@ -25,30 +20,43 @@ class Robot(Object):
     def getShape(self):
         return 2#Object.Shape.CIRCLE
 
-    def __init__(self,parent=None,assignId=True):
-        super(Robot, self).__init__(assignId=assignId)
-        #print("myId: "+str(self.id))
-        self.point = np.array([0,0])
-        self.normal = np.array([0,0])
-
-        self.setPosition(500,500)
-        self.forward = np.array([1.,0.])
-        self.vl = 0#np.array([0.,0.])
-        self.vr = 0#np.array([0.,0.])
-        self.v = (self.vl+self.vr)/2
-        self.size = 100.0
-        self.rsize = np.array([self.size,self.size])
+    def Reset(self):
+        self.prevPos = np.zeros(2)
+        self.maxVeloc = 5
+        self.epsilon = 0.9
+        self.point = np.array([0, 0])
+        self.normal = np.array([0, 0])
+        # main properties
+        self.setPosition(500, 500)
+        self.forward = np.array([1., 0.])
+        self.vl = 0.0
+        self.vr = 0.0
+        self.v = (self.vl + self.vr) / 2
+        self.size = 50.0
+        self.rsize = np.array([self.size, self.size])
         self.l = 250
         self.ICC = self.pos
-        self.rotation =0
+        self.rotation = 0
         self.R = 0
-        xAxes =np.array([1,0])
+        xAxes = np.array([1, 0])
         self.theta = np.arccos(np.dot(self.forward, xAxes) / (
-                    np.linalg.norm(self.forward) * np.linalg.norm(xAxes)))  # self.angle(self.forward,np.array([1,0]))
+                np.linalg.norm(self.forward) * np.linalg.norm(xAxes)))  # self.angle(self.forward,np.array([1,0]))
 
         self.sThreshold = 200
         self.updateSensors()
         self.sDistances = np.zeros((len(self.sensors),))
+        self.sEnableFlags = np.ones((len(self.sensors),),dtype=bool)
+        self.isActive = True
+
+
+
+    def __init__(self,parent=None,assignId=True):
+        super(Robot, self).__init__(assignId=assignId)
+
+        #print("myId: "+str(self.id))
+        #debug params
+        self.Reset()
+
 
     #angle between Ox and forward vector
 
@@ -62,7 +70,7 @@ class Robot(Object):
             temp = np.array([np.cos(angle) * xAxes[0] - np.sin(angle) * xAxes[1],
              np.sin(angle) * xAxes[0] + np.cos(angle) * xAxes[1],
              ])
-            self.sensors.append(self.pos + temp*self.rsize[0]/2)
+            self.sensors.append(self.pos + temp*self.rsize[0])
 
 
 
@@ -111,97 +119,34 @@ class Robot(Object):
         return [intersection[0],intersection[1]]
 
 
-    def checkLineRect(self,p1,p2,rx,ry,rw,rh):
-        r1= [rx - rw/2,ry-rh/2]
-        r2= [rx + rw/2,ry-rh/2]
-        r3= [rx - rw/2,ry+rh/2]
-        r4= [rx + rw/2,ry+rh/2]
 
-        min_x = np.min([r1[0], r2[0], r3[0], r4[0]])
-        min_y = np.min([r1[1], r2[1], r3[1], r4[1]])
-        max_x = np.max([r1[0], r2[0], r3[0], r4[0]])
-        max_y = np.max([r1[1], r2[1], r3[1], r4[1]])
 
-        if ((p1[0] < min_x and p2[0] < min_x) or
-            (p1[1] > max_y and p2[1] > max_y) or
-            (p1[0] > max_x and p2[0] > max_x) or
-            (p1[1] < min_y and p2[1] < min_y)
-        ):
-            return None
-        if p2[0] < min_x:
-            if p2[1] > min_y and p2[1] < max_y:
-                if p1[0] > max_x:
-                    return self.checkLinePoint(p1, p2, [max_x, min_y], [max_x, max_y])
-                elif p1[1] > max_y:
-                    return self.checkLinePoint(p1, p2, [min_x, max_y], [max_x, max_y])
-                else:
-                    return self.checkLinePoint(p1, p2, [min_x, min_y], [max_x, min_y])
+    def checkLineRect3(self, ps, pe,rtl, rtr, rbl, rbr):
+        denoms = []
+        top = self.checkLinePoint3(ps, pe, rtl, rtr)
+        if top != None:
+            denoms.append(top)
 
-            elif p2[1] < min_y:
-                if p1[0]>max_x:
-                    return self.checkLinePoint(p1, p2, [max_x, min_y], [max_x, max_y])
-                else:
-                    return self.checkLinePoint(p1, p2, [min_x, max_y], [max_x, max_y])
+        right = self.checkLinePoint3(ps, pe, rtr, rbr)
+        if right != None:
+            denoms.append(right)
 
-            else:
-                if p1[0]>max_x:
-                    return self.checkLinePoint(p1, p2, [max_x, min_y], [max_x, max_y])
-                else:
-                    return self.checkLinePoint(p1, p2, [min_x, min_y], [max_x, min_y])
-        elif p2[0] > max_x:
-            if p2[1] > min_y and p2[1] < max_y:
-                if p1[0] < min_x:
-                    return self.checkLinePoint(p1, p2, [min_x, min_y], [min_x, max_y])
-                elif p1[1] > max_y:
-                    return self.checkLinePoint(p1, p2, [min_x, max_y], [max_x, max_y])
-                else:
-                    return self.checkLinePoint(p1, p2, [min_x, min_y], [max_x, min_y])
-            elif p2[1] < min_y:
-                if p1[0]< min_x:
-                    return self.checkLinePoint(p1, p2, [min_x, min_y], [min_x, max_y])
-                else:
-                    return self.checkLinePoint(p1, p2, [min_x, max_y], [max_x, max_y])
-            else:
-                if p1[0]< min_x:
-                    return self.checkLinePoint(p1, p2, [min_x, min_y], [min_x, max_y])
-                else:
-                    return self.checkLinePoint(p1, p2, [min_x, min_y], [max_x, min_y])
+        bot = self.checkLinePoint3(ps, pe, rbr, rbl)
+        if bot != None:
+            denoms.append(bot)
+
+        left = self.checkLinePoint3(ps, pe, rbl, rtl)
+        if left != None:
+            if self.onRect(left, rtl, rbr):
+                denoms.append(left)
+
+        if len(denoms) == 0:
+            return False, np.zeros((2,))
         else:
-            if p2[1] < min_y:
-                if p1[0] < min_x:
-                    return self.checkLinePoint(p1, p2, [min_x, min_y], [min_x, max_y])
-                elif p1[0]>max_x:
-                    return self.checkLinePoint(p1, p2, [max_x, max_y], [max_x, max_y])
-                else:
-                    return self.checkLinePoint(p1, p2, [min_x, max_y], [max_x, max_y])
-            if (p2[1] > max_y):
-                if p1[0] < min_x:
-                    return self.checkLinePoint(p1, p2, [min_x, min_y], [min_x, max_y])
-                elif p1[0]>max_x:
-                    return self.checkLinePoint(p1, p2, [max_x, min_y], [max_x, max_y])
-                else:
-                    return self.checkLinePoint(p1, p2, [min_x, min_x], [max_x, min_y])
-            else:
-                if p1[0]<min_x:
-                    return self.checkLinePoint(p1, p2, [min_x, min_y], [min_x, max_y])
-                elif p1[0]>max_x:
-                    return self.checkLinePoint(p1, p2, [max_x, min_y], [max_x, max_y])
-                if p1[1]<min_y:
-                    return self.checkLinePoint(p1, p2, [min_x, min_y], [max_x, min_y])
-                elif p1[1]>max_y:
-                    return self.checkLinePoint(p1, p2, [min_x, max_y], [max_x, max_y])
-
-
-        return None
-
-
-
-
-    def onRect(self,ret,rtl,rbr):
-        return  not(ret[0] <rtl[0] or ret[0] > rbr[0] or
-                ret[1] < rtl[1] or ret[1] > rbr[1]
-        )
-
+            vec = denoms - ps
+            dist = np.linalg.norm(vec,axis=1)
+            minIndex = np.argmin(dist)
+            return True, denoms[minIndex]
 
     def checkLineRect2(self,ps,pe,rx,ry,rw,rh):
         rtl = np.array([rx - rw / 2, ry - rh / 2])
@@ -239,60 +184,124 @@ class Robot(Object):
             return True,points[minIndex]
 
 
+    def updateSensorInfo(self,tempPos,other):
+        #if self.prevPos[0] != tempPos[0] or self.prevPos[1] != tempPos[1]:
 
+        rtl = other.getDot(0)
+        rtr = other.getDot(1)
+        rbl = other.getDot(2)
+        rbr = other.getDot(3)
+        for i, sensor in enumerate(self.sensors):
+            if self.sDistances[i] == 0:
+                norVec = Utils.normalizeByDivideNorm(sensor - tempPos)
+                sensorThreshold = sensor + norVec * self.sThreshold
+
+                doInteract, contractPoint = self.checkLineRect3(sensor, sensorThreshold, rtl, rtr, rbl, rbr)
+
+                if doInteract:
+                    self.sDistances[i] = np.linalg.norm(contractPoint - sensor)
 
     def checkCollision(self, other, doResponse=True):
-
         if doResponse:
+            if self.prevPos[0] != self.pos[0] or self.prevPos[1] != self.pos[1]:
+                rtl = other.getDot(0)
+                rtr = other.getDot(1)
+                rbl = other.getDot(2)
+                rbr = other.getDot(3)
+                for i,sensor in enumerate(self.sensors):
+                    if self.sDistances[i] == 0:
+                        norVec = Utils.normalizeByDivideNorm(sensor-self.pos)
+                        sensorThreshold = sensor+norVec*self.sThreshold
 
-            for i,sensor in enumerate(self.sensors) :
+                        doInteract, contractPoint = self.checkLineRect3(sensor, sensorThreshold, rtl,rtr,rbl,rbr)
 
-                norVec = Utils.normalizeByDivideNorm(sensor-self.pos)
-                sensorThreshold = sensor+norVec*self.sThreshold
-
-                doActive,contractPoint = self.checkLineRect2(sensor,sensorThreshold, other.pos[0], other.pos[1],
-                                                   other.rsize[0], other.rsize[1])
-                if doActive:
-                    self.sDistances[i] = np.linalg.norm(contractPoint-sensor)
-                '''
-                norVec = Utils.normalizeByDivideNorm(sensor-self.pos)
-    
-                contractPoint = self.checkLineRect(sensor, sensor+norVec*self.sThreshold, other.pos[0], other.pos[1],
-                                                                      other.rsize[0], other.rsize[1])
-    
-                if contractPoint != None:
-                    if not ( contractPoint[0] < other.pos[0]-other.rsize[0]/2 or   contractPoint[0] > other.pos[0]+other.rsize[0]/2 or
-                            contractPoint[1] < other.pos[1]-other.rsize[1] / 2 or contractPoint[1] > other.pos[1]+other.rsize[1] / 2
-                    ):
-                        self.sDistances[i] = np.linalg.norm(contractPoint-sensor)# np.array([contractPoint])
-                '''
-
-
-
+                        if doInteract:
+                            self.sDistances[i] = np.linalg.norm(contractPoint-sensor)
         return super(Robot,self).checkCollision(other,doResponse)
 
+    def checkCollisionWithNewPos(self,tempPos,wall):
+        rminX = wall.projectOnto(wall.getDot(0), [1, 0])
+        rmaxX = wall.projectOnto(wall.getDot(3), [1, 0])
+        rminY = wall.projectOnto(wall.getDot(0), [0, 1])
+        rmaxY = wall.projectOnto(wall.getDot(3), [0, 1])
+        ps = []
+        for dot in wall.dots:
+            p1, p2 = wall.interactCirclePoint(dot[0], dot[1],tempPos[0], tempPos[1], self.rsize[0])
+            p3, p4 = wall.interactCirclePoint(dot[0], dot[1], self.pos[0], self.pos[1], self.rsize[0])
+            ps.append(p1)
+            ps.append(p2)
+            ps.append(p3)
+            ps.append(p4)
+        if tempPos[0] != self.pos[0] or tempPos[1] != self.pos[1]:
+            p5, p6 = wall.interactCirclePoint(self.pos[0], self.pos[1], tempPos[0], tempPos[1], self.rsize[0])
+            ps.append(p5)
+            ps.append(p6)
+        ps = np.copy(ps)
+
+        minXIndex = np.argmin(ps[:, 0])
+        maxXIndex = np.argmax(ps[:, 0])
+
+        minYIndex = np.argmin(ps[:, 1])
+        maxYIndex = np.argmax(ps[:, 1])
+
+        cminX = self.projectOnto(ps[minXIndex], [1, 0])
+        cmaxX = self.projectOnto(ps[maxXIndex], [1, 0])
+
+        cminY = self.projectOnto(ps[minYIndex], [0, 1])
+        cmaxY = self.projectOnto(ps[maxYIndex], [0, 1])
+
+        isCollided = False
+        if not (rminX[0] > cmaxX[0] or cminX[0] > rmaxX[0]):
+            #overlap X
+            if not (rminY[1] > cmaxY[1] or cminY[1] > rmaxY[1]):
+                #overlap Y
+                isCollided =True
+                #print("overlap on X,Y")
+                minorOverlapX  = min(cmaxX[0],rmaxX[0]) - max(cminX[0],rminX[0])
+                minorOverlapY  = min(cmaxY[1],rmaxY[1]) - max(cminY[1],rminY[1])
+                if minorOverlapX < minorOverlapY:
+                    #print("horizontal collision")
+                    if  self.pos[0]< wall.pos[0]:  #cmaxX[0] < rmaxX[0]:
+                       #print("left collision")
+                        self.onCollisionWith(wall,-1,0, np.zeros(2))
+                    else:
+                        #print("right collision")
+                        self.onCollisionWith(wall,1,0, np.zeros(2))
+                else:
+                    #print("vertical collision")
+                    if self.pos[1]< wall.pos[1]:  # cmaxY[1] < rmaxY[1]:
+                        #print("top collision")
+                        self.onCollisionWith(wall,0,-1, np.zeros(2))
+                    else:
+                        #print("bot collision")
+                        self.onCollisionWith(wall,0,1, np.zeros(2))
+        return isCollided
 
     def onCollisionWith(self, obj, normalX, normalY, contractPoint):
 
         projection = np.array([0,0])
-        if normalX !=0 and normalY !=0:
-            vec = np.array([0,0])
-            self.vl = self.vr = 0
-            return True
-        else:
-            if normalX !=0:
-                if normalX > 0:
-                    vec = np.array([0,-1])
-                else:
-                    vec = np.array([0,1])
+        #if normalX !=0 and normalY !=0:
+        #    vec = np.array([0,0])
+        #    self.vl = self.vr = 0
+        #    return True
+        #else:
+        if normalX !=0:
+            if normalX > 0:
+                vec = np.array([0,-1])
+                self.pos[0] = obj.pos[0]+self.rsize[0] +obj.rsize[0]/2 #+0.1
             else:
-                if normalY > 0:
-                    vec = np.array([-1,0])
-                else:
-                    vec = np.array([1,0])
+                vec = np.array([0,1])
+                self.pos[0] = obj.pos[0]-self.rsize[0] -obj.rsize[0]/2 #-0.1
+        else:
+            if normalY > 0:
+                vec = np.array([-1,0])
+                self.pos[1] = obj.pos[1]+self.rsize[0] +obj.rsize[1]/2 #+0.1
+            else:
+                vec = np.array([1,0])
+                self.pos[1] = obj.pos[1]-self.rsize[0] -obj.rsize[1]/2 #- 0.1
 
         planeVec = vec
-        projection = np.multiply(self.forward, planeVec) / (planeVec[0] ** 2 + planeVec[1] ** 2) * planeVec
+        projection = np.multiply(self.forward, planeVec) / np.linalg.norm(planeVec)
 
 
         if projection[0] !=0:
@@ -306,10 +315,9 @@ class Robot(Object):
              else:
                  vec = np.array([ 0,-1 ])
 
-        n =  Utils.normalizeByDivideNorm(contractPoint - self.pos)
-
-
-        self.forward = Utils.normalizeByDivideNorm(vec)
+        #n =  Utils.normalizeByDivideNorm(contractPoint - self.pos)
+        '''
+        self.forward = vec
         lastTheta= np.rad2deg(self.theta)
         self.theta = np.arccos(np.dot(self.forward, np.array([1, 0])) / (
                 np.linalg.norm(self.forward)*np.linalg.norm(np.array([1, 0]))))  # self.angle(self.forward,np.array([1,0]))
@@ -318,21 +326,41 @@ class Robot(Object):
 
         if lastTheta <0:
              self.theta = -self.theta
-
-
+        '''
+        #self.vl = self.vr = 0
         return True
 
+    def setVelocity(self,vLeft,vRight):
+        if vLeft >= 0 :
+            self.vl = min(vLeft,self.maxVeloc)
+        else:
+            self.vl = max(vLeft,-self.maxVeloc)
+
+        if vRight >= 0:
+            self.vr = min(vRight, self.maxVeloc)
+        else:
+            self.vrvl = max(vRight, -self.maxVeloc)
+
+    #box = namedtuple('Box',['x','y','w','h'])
+    #Box = namedtuple('Box','x y w h')
+    def getBoundingBox(self):
+        delta = self.pos - self.prevPos
+        box = Object.Box(self.prevPos[0], self.prevPos[1],delta[0] +self.rsize[0],delta[1]+self.rsize[1])
+        return box
 
     def updateTransform(self,dt):
+
+        tempPos =  np.copy(self.pos)
+        self.prevPos = np.copy(self.pos)
+
         xAxes = np.array([1, 0])
         delta = self.vr - self.vl
-        if delta != 0:
-
+        if delta < -self.epsilon or delta > self.epsilon:
             self.rotation = delta / self.l
             self.R = self.l/2 * (self.vr + self.vl)/delta
             #temp1 = self.vl * xAxes#self.forward
             #temp2 = self.vr * xAxes#self.forward
-
+            print("rotation = "+str(self.rotation)+",theta = "+str(self.theta))
             #self.forward = (temp1 + temp2)/2
 
             self.ICC = np.array([self.pos[0]- self.R * np.sin(self.theta),
@@ -348,15 +376,19 @@ class Robot(Object):
             backLocationMatrix = np.array([self.ICC[0],
                                            self.ICC[1],
                                            odt])
-            retMatrix = np.dot(rotMatrix,toOriginMatrix) + backLocationMatrix
+            retMatrix =  np.dot(rotMatrix,toOriginMatrix) + backLocationMatrix
 
-            self.pos = np.array([retMatrix[0],retMatrix[1]])
+            #self.pos = np.array([retMatrix[0],retMatrix[1]])
+            tempPos = np.array([retMatrix[0],retMatrix[1]])
             self.theta = retMatrix[2]
-
             self.forward = np.array(
                 [np.cos(self.theta)*xAxes[0] - np.sin(self.theta)*xAxes[1],
                     np.sin(self.theta) * xAxes[0] + np.cos(self.theta) * xAxes[1],
                 ])
+
+            self.forward /= np.linalg.norm(self.forward)
+
+
             #aVec = self.ICC - self.pos
             #aVec= np.linalg.norm(aVec,ord=1,keepdims=True)
             #self.forward = np.array([aVec[1],-aVec[0]])
@@ -380,13 +412,20 @@ class Robot(Object):
             f = np.copy(self.forward)
             f/= np.linalg.norm(self.forward)
 
+            if self.vl > 0:
+                signal = 1
+            else:
+                signal = -1
+
             self.rotation =0
-            self.ICC = self.pos
-            self.pos = self.pos + f * (self.vl+self.vr)/2
+            self.ICC = np.copy(self.pos)
+            tempPos = self.pos + f * signal * self.vl**2 * dt
 
 
-        self.updateSensors()
-        return True
+
+
+
+        return tempPos
 
     def clone(self,assignId=False ):
         cloner = Robot(assignId)
@@ -410,17 +449,19 @@ class Robot(Object):
 
     def draw(self,qp):
         #body
-        origin = np.array([self.pos[0] - self.rsize[0]/2,self.pos[1] - self.rsize[0]/2])
+        origin = np.array([self.pos[0] - self.rsize[0],self.pos[1] - self.rsize[0]])
         pen = QPen(Qt.red, 1.5, Qt.SolidLine)
         qp.setPen(pen)
-        qp.drawEllipse(origin[0], origin[1], self.rsize[0], self.rsize[0])
+        qp.drawEllipse(origin[0], origin[1], self.rsize[0]*2, self.rsize[0]*2)
 
         #qp.drawPie(QRectF(origin[0], origin[1], self.size, self.size), 0, 5760)
         #forward
         pen2 = QPen(Qt.red, 0.5, Qt.SolidLine)
         qp.setPen(pen2)
         f = self.forward #Utils.normalize(self.forward)
-        qp.drawLine(self.pos[0], self.pos[1], self.pos[0]+f[0]*self.size/2, self.pos[1]+f[1]*self.size/2)
+        qp.drawLine(self.pos[0], self.pos[1], self.pos[0]+f[0]*self.size, self.pos[1]+f[1]*self.size)
+
+
 
         #ICC debug
         pen3 = QPen(Qt.magenta, 1.5, Qt.SolidLine)
@@ -461,33 +502,25 @@ class Robot(Object):
         qp.setPen(pen)
 
         #qp.drawPoint(textPos[0], textPos[1])
-        qp.drawText(QPointF(lefTextPos[0] ,lefTextPos[1] ),str(self.vl))
+        qp.drawText(QPointF(lefTextPos[0] ,lefTextPos[1] ),str("{:.2f}".format(self.vl)))
 
         rightTextPos = self.pos + pVec * -50
         pen = QPen(Qt.red, 1, Qt.SolidLine)
         qp.setPen(pen)
 
         # qp.drawPoint(textPos[0], textPos[1])
-        qp.drawText(QPointF(rightTextPos[0], rightTextPos[1]), str(self.vr))
+        qp.drawText(QPointF(rightTextPos[0], rightTextPos[1]),str("{:.2f}".format(self.vr)))
 
 
 
         for i,sensor in enumerate(self.sensors) :
             #pen6 = QPen(Qt.darkCyan, 0.01, Qt.SolidLine)
-            pen6 = QPen(Qt.darkCyan, 0.01, Qt.SolidLine)
+            pen6 = QPen(Qt.darkCyan, 1, Qt.SolidLine)
             qp.setPen(pen6)
             norVec = Utils.normalizeByDivideNorm(sensor - self.pos) *self.sThreshold
             qp.drawText(QPointF(sensor[0] +norVec[0], sensor[1]+norVec[1]), str("{:.1f}".format(self.sDistances[i])))
-            #qp.drawText(QPointF(sensor[0] + norVec[0], sensor[1] + norVec[1]), str(self.sDistances[i]))
-            #qp.drawPoint(self.sDistances[i][0],self.sDistances[i][1])
-            #pen6 = QPen(Qt.darkCyan, 6, Qt.SolidLine)
-            #qp.setPen(pen6)
-
-            #pen6 = QPen(Qt.darkCyan, 1, Qt.SolidLine)
-            #qp.setPen(pen6)
             #qp.drawLine(sensor[0], sensor[1], sensor[0] + norVec[0], sensor[1] + norVec[1])
 
-            #qp.drawLine(sensor[0], sensor[1], self.sDistances[i][0],self.sDistances[i][1])
 
 
         return True
