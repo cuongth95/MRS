@@ -224,6 +224,26 @@ class Robot(Object):
         rmaxX = wall.projectOnto(wall.getDot(3), [1, 0])
         rminY = wall.projectOnto(wall.getDot(0), [0, 1])
         rmaxY = wall.projectOnto(wall.getDot(3), [0, 1])
+
+
+        horRect=wall.getDot(0) - wall.getDot(1)
+        verRect=wall.getDot(0) - wall.getDot(2)
+
+        projHorTempPos = self.projectOnto(tempPos,horRect)
+        projVerTempPos = self.projectOnto(tempPos,verRect)
+
+        projHorSelfPos = self.projectOnto(self.pos,horRect)
+        projVerSelfPos = self.projectOnto(self.pos,verRect)
+
+
+        p1, p2 = wall.interactCirclePoint(projHorTempPos[0], projHorTempPos[1], tempPos[0], tempPos[1], self.rsize[0])
+        p3, p4 = wall.interactCirclePoint(projVerTempPos[0], projVerTempPos[1], tempPos[0], tempPos[1], self.rsize[0])
+
+        p5, p6 = wall.interactCirclePoint(projHorSelfPos[0], projHorSelfPos[1], self.pos[0], self.pos[1], self.rsize[0])
+        p7, p8 =wall.interactCirclePoint(projVerSelfPos[0], projVerSelfPos[1], self.pos[0], self.pos[1], self.rsize[0])
+
+        ps = np.array([p1,p2,p3,p4,p5,p6,p7,p8])
+        '''
         ps = []
         for dot in wall.dots:
             p1, p2 = wall.interactCirclePoint(dot[0], dot[1],tempPos[0], tempPos[1], self.rsize[0])
@@ -236,7 +256,9 @@ class Robot(Object):
             p5, p6 = wall.interactCirclePoint(self.pos[0], self.pos[1], tempPos[0], tempPos[1], self.rsize[0])
             ps.append(p5)
             ps.append(p6)
+        
         ps = np.copy(ps)
+        '''
 
         minXIndex = np.argmin(ps[:, 0])
         maxXIndex = np.argmax(ps[:, 0])
@@ -299,11 +321,24 @@ class Robot(Object):
             else:
                 vec = np.array([1,0])
                 self.pos[1] = obj.pos[1]-self.rsize[0] -obj.rsize[1]/2 #- 0.1
+        '''
+        planeVec = np.array([normalY,-normalX])
 
-        planeVec = vec
-        projection = np.multiply(self.forward, planeVec) / np.linalg.norm(planeVec)
+        #projVec = Object.projectOnto(self.forward,planeVec)
+
+        #invertProjVec =
+            
+        normal = np.array([normalX,normalY])
+        r = self.forward - 2*(np.dot(self.forward,normal)*normal)
+
+        #b = self.projectOnto(r,planeVec)
+        self.forward =r# b
+        self.theta = np.arccos(np.dot(self.forward, np.array([1, 0])) / (
+                np.linalg.norm(self.forward) * np.linalg.norm(
+            np.array([1, 0]))))  # self.angle(self.forward,np.array([1,0]))
 
 
+        
         if projection[0] !=0:
              if projection[0] >0:
                  vec = np.array([ 1,0 ])
@@ -314,7 +349,7 @@ class Robot(Object):
                  vec = np.array([ 0,1 ])
              else:
                  vec = np.array([ 0,-1 ])
-
+        '''
         #n =  Utils.normalizeByDivideNorm(contractPoint - self.pos)
         '''
         self.forward = vec
@@ -360,7 +395,7 @@ class Robot(Object):
             self.R = self.l/2 * (self.vr + self.vl)/delta
             #temp1 = self.vl * xAxes#self.forward
             #temp2 = self.vr * xAxes#self.forward
-            print("rotation = "+str(self.rotation)+",theta = "+str(self.theta))
+            #print("rotation = "+str(self.rotation)+",theta = "+str(self.theta))
             #self.forward = (temp1 + temp2)/2
 
             self.ICC = np.array([self.pos[0]- self.R * np.sin(self.theta),

@@ -108,7 +108,7 @@ class MRS(QMainWindow):#(QWidget):#
 
         #self.robot.vl=self.robot.vr = 25
         #self.robot.pos = np.array([1020,500])
-        '''
+
         if not self.isCollided:
             tempPos = self.robot.updateTransform(dt)
         else:
@@ -132,11 +132,7 @@ class MRS(QMainWindow):#(QWidget):#
                 self.robot.updateSensorInfo(self.robot.pos, wall)
 
 
-       
-        #self.robot.sDistances = np.zeros(len(self.robot.sensors))
-        '''
-
-        self.ea.updateLogic(dt)
+        #self.ea.updateLogic(dt)
         return True
 
 
@@ -223,9 +219,9 @@ class MRS(QMainWindow):#(QWidget):#
 
         #qp.drawLine(self.cminY[0], self.cminY[1], self.cmaxY[0], self.cmaxY[1])
         #print("robotpos = "+str(self.robot.pos))
-        #self.robot.draw(qp)
+        self.robot.draw(qp)
 
-        self.ea.draw(qp)
+        #self.ea.draw(qp)
 
         for wall in self.walls:
             wall.draw(qp)

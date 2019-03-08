@@ -89,17 +89,44 @@ class Evolution:
             #self.gens.append(np.copy(temp.sDistances))
             #self.prevPoses.append(np.copy(temp.pos))
 
+    minDist = 0
+    maxDist = 10000
+    weightDistance = 0.3
+    minSpeed = 0
+    maxSpeed = 5
+    weightSpeed = 0.2
 
+    weightFreeCollision = 0.5
+    def objectiveDistanceNorm(self,x):
+        ret = (x - self.minDist) / self.maxDist
+        return ret
 
+    def objectiveSpeedNorm(self,x):
+        ret = (x - self.minSpeed) / self.maxSpeed
+        return ret
 
     def fitness(self,r):
         f = np.zeros((len(r), 1))
 
+
+
         for i, robot in enumerate(r):
             if robot.isActive:
-                f[i] = np.linalg.norm(robot.pos -self.startPos) * (robot.vl + robot.vr)/2
+                isFreeCollision = 1
             else:
-                f[i] = np.linalg.norm(robot.pos - self.startPos)
+                isFreeCollision = 0
+            dist = np.linalg.norm(robot.pos - self.startPos)
+            dist = self.weightDistance * self.objectiveDistanceNorm(dist)
+            speed = self.weightSpeed * self.objectiveSpeedNorm((robot.vl + robot.vr) / 2)
+
+
+            f[i] =dist  +speed  + self.weightFreeCollision * isFreeCollision
+            print("f["+str(i)+"]="+str(f[i]))
+
+            #if robot.isActive:
+            #    f[i] = np.linalg.norm(robot.pos -self.startPos) * (robot.vl + robot.vr)/2
+            #else:
+            #    f[i] = np.linalg.norm(robot.pos - self.startPos)
 
 
 
@@ -160,7 +187,7 @@ class Evolution:
             else:
                 robot.isActive = False
 
-        if not isExisted or self.timeCounter > self.timeLimit:
+        if not isExisted: #or self.timeCounter > self.timeLimit:
             # all robot collided -> dead
             self.timeCounter = 0
             self.cycle += 1
@@ -176,7 +203,7 @@ class Evolution:
         if self.curIndex < self.population:
             i = self.curIndex
             robot = self.robots[i]
-            if not robot.isActive or self.timeCounter > self.timeLimit :
+            if  self.timeCounter > self.timeLimit :
                 self.curIndex+=1
                 self.numExistRobots = self.population - self.curIndex
                 self.timeCounter = 0
@@ -246,8 +273,8 @@ class Evolution:
         #per one
         if  self.curIndex < self.population:
             curRobot =self.robots[self.curIndex]
-            if curRobot.isActive:
-                curRobot.draw(qp)
+            #if curRobot.isActive:
+            curRobot.draw(qp)
 
         qp.drawText(QPointF(100,50), "Cycle: " + str(self.cycle))
         qp.drawText(QPointF(100,100), "Num existed robots: " + str(self.numExistRobots))
