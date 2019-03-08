@@ -310,18 +310,18 @@ class Robot(Object):
         if normalX !=0:
             if normalX > 0:
                 vec = np.array([0,-1])
-                self.pos[0] = obj.pos[0]+self.rsize[0] +obj.rsize[0]/2 #+0.1
+                self.pos[0] = obj.pos[0]+self.rsize[0] +obj.rsize[0]/2 +0.1
             else:
                 vec = np.array([0,1])
-                self.pos[0] = obj.pos[0]-self.rsize[0] -obj.rsize[0]/2 #-0.1
+                self.pos[0] = obj.pos[0]-self.rsize[0] -obj.rsize[0]/2 -0.1
         else:
             if normalY > 0:
                 vec = np.array([-1,0])
-                self.pos[1] = obj.pos[1]+self.rsize[0] +obj.rsize[1]/2 #+0.1
+                self.pos[1] = obj.pos[1]+self.rsize[0] +obj.rsize[1]/2 +0.1
             else:
                 vec = np.array([1,0])
-                self.pos[1] = obj.pos[1]-self.rsize[0] -obj.rsize[1]/2 #- 0.1
-        '''
+                self.pos[1] = obj.pos[1]-self.rsize[0] -obj.rsize[1]/2 - 0.1
+
         planeVec = np.array([normalY,-normalX])
 
         #projVec = Object.projectOnto(self.forward,planeVec)
@@ -331,14 +331,18 @@ class Robot(Object):
         normal = np.array([normalX,normalY])
         r = self.forward - 2*(np.dot(self.forward,normal)*normal)
 
-        #b = self.projectOnto(r,planeVec)
-        self.forward =r# b
-        self.theta = np.arccos(np.dot(self.forward, np.array([1, 0])) / (
-                np.linalg.norm(self.forward) * np.linalg.norm(
-            np.array([1, 0]))))  # self.angle(self.forward,np.array([1,0]))
+        b = self.projectOnto(r,planeVec)
+        magB =np.linalg.norm(b)
+        if magB != 0:
+            self.forward =  b / magB
+            #self.theta = np.arccos(np.dot(self.forward, np.array([1, 0])) / (
+            #        np.linalg.norm(self.forward) * np.linalg.norm(
+            #    np.array([1, 0]))))  # self.angle(self.forward,np.array([1,0]))
 
+            self.pos = self.pos + self.forward * (self.vl + self.vr)/2
 
-        
+        print("pos = "+str(self.pos))
+        '''
         if projection[0] !=0:
              if projection[0] >0:
                  vec = np.array([ 1,0 ])
