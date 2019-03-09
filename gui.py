@@ -15,12 +15,13 @@ from Wall import  Wall
 from Object import Object
 import Evolution
 import numpy as np
+import Utils
 
 
 class MRS(QMainWindow):#(QWidget):#
 
-    screenWidth = 1080
-    screenHeight= 720
+    screenWidth = Utils.SCREEN_WIDTH
+    screenHeight= Utils.SCREEN_HEIGHT
 
     def __init__(self):
         self.frameRate = 60
@@ -37,7 +38,7 @@ class MRS(QMainWindow):#(QWidget):#
 
         self.box = None
         self.walls = []
-        self.robot = Robot()
+        self.robot = Robot(startPos=[500,600])
         #self.wallLeft = Wall()
         #self.wallRight = Wall()
         #self.wallTop = Wall()
@@ -45,7 +46,7 @@ class MRS(QMainWindow):#(QWidget):#
 
         centerX,centerY = self.getCenter()
         #self.wallMid =
-        self.walls.append(Wall(centerX,centerY,100,100))
+        self.walls.append(Wall(centerX,centerY,300,300))
         self.walls.append(Wall(centerX-self.screenWidth/2, centerY, 20, self.screenHeight))
         self.walls.append(Wall(centerX+self.screenWidth/2, centerY, 20, self.screenHeight))
         self.walls.append(Wall(centerX, centerY-self.screenHeight/2, self.screenWidth, 20))
@@ -57,11 +58,11 @@ class MRS(QMainWindow):#(QWidget):#
         self.prevPos = self.robot.pos
 
         self.robot.updateSensors()
-        self.robot.sDistances = np.zeros(len(self.robot.sensors))
+        self.robot.sDistances = np.full(len(self.robot.sensors),self.robot.sThreshold)#np.zeros(len(self.robot.sensors))
         for wall in self.walls:
             self.robot.updateSensorInfo(self.robot.pos, wall)
 
-        self.ea = Evolution.Evolution(self,[500,500],200)
+        self.ea = Evolution.Evolution(self,[540,600],200)
 
 
 
@@ -88,6 +89,7 @@ class MRS(QMainWindow):#(QWidget):#
 
         self.timer.start(1000.0/60,self)
 
+    '''
     def checkCollision(self,r,doResponse=True):
         collideFlag = False
 
@@ -99,7 +101,7 @@ class MRS(QMainWindow):#(QWidget):#
                 collideFlag = temp
 
         return collideFlag
-
+    '''
 
 
     def updateLogic(self,dt):
@@ -117,7 +119,7 @@ class MRS(QMainWindow):#(QWidget):#
         #tempPos = np.array([1056.009,500])
         self.isCollided = False
         for wall in self.walls:
-            flag = self.robot.checkCollisionWithNewPos(tempPos,wall)
+            flag = self.robot.checkCollisionWithNewPos(tempPos,wall,self.isCollided)
             if not self.isCollided:
                 self.isCollided = flag
 
@@ -127,7 +129,7 @@ class MRS(QMainWindow):#(QWidget):#
 
         if self.robot.prevPos[0] != self.robot.pos[0] or self.robot.prevPos[1] != self.robot.pos[1]:
             self.robot.updateSensors()
-            self.robot.sDistances = np.zeros(len(self.robot.sensors))
+            self.robot.sDistances = np.full(len(self.robot.sensors),self.robot.sThreshold)#np.zeros(len(self.robot.sensors))
             for wall in self.walls:
                 self.robot.updateSensorInfo(self.robot.pos, wall)
 
@@ -179,8 +181,7 @@ class MRS(QMainWindow):#(QWidget):#
             self.robot.vl = 0
 
         if key == Qt.Key_C:
-            self.robot.setPosition(500,500)
-            self.robot.Reset()
+            self.robot.Reset(startPos=[500,500])
             return None
 
         if self.doPress:

@@ -20,14 +20,14 @@ class Robot(Object):
     def getShape(self):
         return 2#Object.Shape.CIRCLE
 
-    def Reset(self):
+    def Reset(self,startPos):
         self.prevPos = np.zeros(2)
         self.maxVeloc = 5
         self.epsilon = 0.9
         self.point = np.array([0, 0])
         self.normal = np.array([0, 0])
         # main properties
-        self.setPosition(500, 500)
+        self.pos = np.copy(startPos)
         self.forward = np.array([1., 0.])
         self.vl = 0.0
         self.vr = 0.0
@@ -44,18 +44,19 @@ class Robot(Object):
 
         self.sThreshold = 200
         self.updateSensors()
-        self.sDistances = np.zeros((len(self.sensors),))
+        self.sDistances = np.full(len(self.sensors),self.sThreshold)  # np.zeros(len(self.robot.sensors))
+
         self.sEnableFlags = np.ones((len(self.sensors),),dtype=bool)
         self.isActive = True
 
 
 
-    def __init__(self,parent=None,assignId=True):
+    def __init__(self,startPos,parent=None,assignId=True):
         super(Robot, self).__init__(assignId=assignId)
 
         #print("myId: "+str(self.id))
         #debug params
-        self.Reset()
+        self.Reset(startPos)
 
 
     #angle between Ox and forward vector
@@ -192,7 +193,7 @@ class Robot(Object):
         rbl = other.getDot(2)
         rbr = other.getDot(3)
         for i, sensor in enumerate(self.sensors):
-            if self.sDistances[i] == 0:
+            if self.sDistances[i] == self.sThreshold:
                 norVec = Utils.normalizeByDivideNorm(sensor - tempPos)
                 sensorThreshold = sensor + norVec * self.sThreshold
 
@@ -209,7 +210,7 @@ class Robot(Object):
                 rbl = other.getDot(2)
                 rbr = other.getDot(3)
                 for i,sensor in enumerate(self.sensors):
-                    if self.sDistances[i] == 0:
+                    if self.sDistances[i] == self.sThreshold:
                         norVec = Utils.normalizeByDivideNorm(sensor-self.pos)
                         sensorThreshold = sensor+norVec*self.sThreshold
 
@@ -219,7 +220,7 @@ class Robot(Object):
                             self.sDistances[i] = np.linalg.norm(contractPoint-sensor)
         return super(Robot,self).checkCollision(other,doResponse)
 
-    def checkCollisionWithNewPos(self,tempPos,wall):
+    def checkCollisionWithNewPos(self,tempPos,wall,wasCollided):
         rminX = wall.projectOnto(wall.getDot(0), [1, 0])
         rmaxX = wall.projectOnto(wall.getDot(3), [1, 0])
         rminY = wall.projectOnto(wall.getDot(0), [0, 1])
@@ -285,21 +286,21 @@ class Robot(Object):
                     #print("horizontal collision")
                     if  self.pos[0]< wall.pos[0]:  #cmaxX[0] < rmaxX[0]:
                        #print("left collision")
-                        self.onCollisionWith(wall,-1,0, np.zeros(2))
+                        self.onCollisionWith(wall,-1,0, np.zeros(2),wasCollided)
                     else:
                         #print("right collision")
-                        self.onCollisionWith(wall,1,0, np.zeros(2))
+                        self.onCollisionWith(wall,1,0, np.zeros(2),wasCollided)
                 else:
                     #print("vertical collision")
                     if self.pos[1]< wall.pos[1]:  # cmaxY[1] < rmaxY[1]:
                         #print("top collision")
-                        self.onCollisionWith(wall,0,-1, np.zeros(2))
+                        self.onCollisionWith(wall,0,-1, np.zeros(2),wasCollided)
                     else:
                         #print("bot collision")
-                        self.onCollisionWith(wall,0,1, np.zeros(2))
+                        self.onCollisionWith(wall,0,1, np.zeros(2),wasCollided)
         return isCollided
 
-    def onCollisionWith(self, obj, normalX, normalY, contractPoint):
+    def onCollisionWith(self, obj, normalX, normalY, contractPoint,wasCollided):
 
         projection = np.array([0,0])
         #if normalX !=0 and normalY !=0:
@@ -307,12 +308,14 @@ class Robot(Object):
         #    self.vl = self.vr = 0
         #    return True
         #else:
+
+
         if normalX !=0:
             if normalX > 0:
-                vec = np.array([0,-1])
+                vec = np.array([0,1])
                 self.pos[0] = obj.pos[0]+self.rsize[0] +obj.rsize[0]/2 +0.1
             else:
-                vec = np.array([0,1])
+                vec = np.array([0,-1])
                 self.pos[0] = obj.pos[0]-self.rsize[0] -obj.rsize[0]/2 -0.1
         else:
             if normalY > 0:
@@ -322,26 +325,36 @@ class Robot(Object):
                 vec = np.array([1,0])
                 self.pos[1] = obj.pos[1]-self.rsize[0] -obj.rsize[1]/2 - 0.1
 
-        planeVec = np.array([normalY,-normalX])
+        if not wasCollided:
+            planeVec = np.array([normalY, -normalX])
+            normal = np.array([normalX, normalY])
+            #print("fw = "+str(self.forward))
+            r = self.forward - 2 * (np.dot(self.forward, normal) * normal)
+
+            b = self.projectOnto(r, planeVec)
+            magB = np.linalg.norm(b)
+            if magB > 0.0001:
+                bNorm = b / magB
+                self.forward = np.copy(bNorm)
+                # self.theta = np.arccos(np.dot(self.forward, np.array([1, 0])) / (
+                #        np.linalg.norm(self.forward) * np.linalg.norm(
+                #    np.array([1, 0]))))  # self.angle(self.forward,np.array([1,0]))
+
+                slidingVec = self.pos + self.forward * (self.vl + self.vr) / 2
+
+                if self.onRect(slidingVec,[0,0],[Utils.SCREEN_WIDTH,Utils.SCREEN_HEIGHT]):
+                    self.pos = slidingVec
+
+
+
+
 
         #projVec = Object.projectOnto(self.forward,planeVec)
 
         #invertProjVec =
-            
-        normal = np.array([normalX,normalY])
-        r = self.forward - 2*(np.dot(self.forward,normal)*normal)
 
-        b = self.projectOnto(r,planeVec)
-        magB =np.linalg.norm(b)
-        if magB != 0:
-            self.forward =  b / magB
-            #self.theta = np.arccos(np.dot(self.forward, np.array([1, 0])) / (
-            #        np.linalg.norm(self.forward) * np.linalg.norm(
-            #    np.array([1, 0]))))  # self.angle(self.forward,np.array([1,0]))
 
-            self.pos = self.pos + self.forward * (self.vl + self.vr)/2
 
-        print("pos = "+str(self.pos))
         '''
         if projection[0] !=0:
              if projection[0] >0:
@@ -497,7 +510,7 @@ class Robot(Object):
         #forward
         pen2 = QPen(Qt.red, 0.5, Qt.SolidLine)
         qp.setPen(pen2)
-        f = self.forward #Utils.normalize(self.forward)
+        f = np.copy(self.forward ) #Utils.normalize(self.forward)
         qp.drawLine(self.pos[0], self.pos[1], self.pos[0]+f[0]*self.size, self.pos[1]+f[1]*self.size)
 
 
