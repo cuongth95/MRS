@@ -23,12 +23,15 @@ class MRS(QMainWindow):#(QWidget):#
     screenWidth = Utils.SCREEN_WIDTH
     screenHeight= Utils.SCREEN_HEIGHT
 
-    def __init__(self):
-        self.frameRate = 60
+    def __init__(self,filePath,doInitParent=True):
+        self.frameRate = 16.7
+        self.filePath = filePath
         #QWidget.__init__(self, None)
-        super(MRS, self).__init__()
+        if doInitParent:
+            super(MRS, self).__init__()
         self.initGame()
-        self.initUI()
+        if doInitParent:
+            self.initUI()
 
     def initGame(self):
         self.cminY = np.zeros(2)
@@ -62,7 +65,8 @@ class MRS(QMainWindow):#(QWidget):#
         for wall in self.walls:
             self.robot.updateSensorInfo(self.robot.pos, wall)
 
-        self.ea = Evolution.Evolution(self,[540,600],200)
+        self.ea = Evolution.Evolution(self,[540,600],200,self.filePath)
+        #self.ea.loadFile()
 
 
 
@@ -87,7 +91,7 @@ class MRS(QMainWindow):#(QWidget):#
         #self.worker.start()
         self.lastFrameTime = time.time()
 
-        self.timer.start(1000.0/60,self)
+        self.timer.start(1000/120,self)
 
     '''
     def checkCollision(self,r,doResponse=True):
@@ -107,7 +111,7 @@ class MRS(QMainWindow):#(QWidget):#
     def updateLogic(self,dt):
 
         self.frameRate = dt * 1000
-
+        '''
         #self.robot.vl=self.robot.vr = 25
         #self.robot.pos = np.array([1020,500])
 
@@ -132,15 +136,27 @@ class MRS(QMainWindow):#(QWidget):#
             self.robot.sDistances = np.full(len(self.robot.sensors),self.robot.sThreshold)#np.zeros(len(self.robot.sensors))
             for wall in self.walls:
                 self.robot.updateSensorInfo(self.robot.pos, wall)
+        '''
 
 
-        #self.ea.updateLogic(dt)
+        if not self.requestSaveFile:
+            self.ea.updateLogic(dt)
+        else:
+            self.ea.saveFile()
+            print("saved at "+self.ea.filePath)
+            #ans= input("saved!Continue? (y/n)")
+            #if ans == 'y' or ans == 'Y':
+            self.requestSaveFile=False
+            #else:
+            #    sys.exit()
+
+        #self.ea.updateLogicWithSpecificGenome(11,dt)
         return True
 
 
 
 
-
+    requestSaveFile = False
     def keyPressEvent(self, event):
         key = event.key()
 
@@ -179,7 +195,8 @@ class MRS(QMainWindow):#(QWidget):#
             #self.doPress = True
             self.robot.vr = 0
             self.robot.vl = 0
-
+        elif key == Qt.Key_Z:
+            self.requestSaveFile = True
         if key == Qt.Key_C:
             self.robot.Reset(startPos=[500,500])
             return None
@@ -220,9 +237,10 @@ class MRS(QMainWindow):#(QWidget):#
 
         #qp.drawLine(self.cminY[0], self.cminY[1], self.cmaxY[0], self.cmaxY[1])
         #print("robotpos = "+str(self.robot.pos))
-        self.robot.draw(qp)
+        #self.robot.draw(qp)
 
-        #self.ea.draw(qp)
+        self.ea.draw(qp)
+        #self.ea.drawSpecificGenome(11,qp)
 
         for wall in self.walls:
             wall.draw(qp)
@@ -253,7 +271,7 @@ class Worker(QThread):
         QThread.__init__(self)
         self.game = g
 
-    FPS = 60
+    FPS = 30
     isRunning = True
     lastFrameTime = 0
     #A QThread is run by calling it's start() function, which calls this run()
@@ -274,7 +292,7 @@ class Worker(QThread):
 
                 #self.game.processEvents()
                 #self.game.render()
-            self.game.update()
+            #self.game.update()
 
 
 
@@ -282,6 +300,6 @@ if __name__ == '__main__':
     QApplication.processEvents()
 
     app = QApplication([])
-    game = MRS()
+    game = MRS("box_weights1.json")
 
     sys.exit(app.exec_())

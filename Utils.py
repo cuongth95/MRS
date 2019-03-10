@@ -1,5 +1,5 @@
 import numpy as np
-import pyglet as pg
+import json
 '''
 @author Truong Huy Cuong
 '''
@@ -73,3 +73,4 @@ def normalize(vec):
     else:
         vecN[1] = 0
     return vecN
+

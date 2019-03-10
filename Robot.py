@@ -21,8 +21,10 @@ class Robot(Object):
         return 2#Object.Shape.CIRCLE
 
     def Reset(self,startPos):
+        self.score = 0
+        self.maxVeloc = 100
+        self.l = 50
         self.prevPos = np.zeros(2)
-        self.maxVeloc = 5
         self.epsilon = 0.9
         self.point = np.array([0, 0])
         self.normal = np.array([0, 0])
@@ -34,7 +36,6 @@ class Robot(Object):
         self.v = (self.vl + self.vr) / 2
         self.size = 50.0
         self.rsize = np.array([self.size, self.size])
-        self.l = 250
         self.ICC = self.pos
         self.rotation = 0
         self.R = 0
@@ -340,7 +341,7 @@ class Robot(Object):
                 #        np.linalg.norm(self.forward) * np.linalg.norm(
                 #    np.array([1, 0]))))  # self.angle(self.forward,np.array([1,0]))
 
-                slidingVec = self.pos + self.forward * (self.vl + self.vr) / 2
+                slidingVec = self.pos + self.forward * (self.vl + self.vr) / 20
 
                 if self.onRect(slidingVec,[0,0],[Utils.SCREEN_WIDTH,Utils.SCREEN_HEIGHT]):
                     self.pos = slidingVec
@@ -471,7 +472,7 @@ class Robot(Object):
 
             self.rotation =0
             self.ICC = np.copy(self.pos)
-            tempPos = self.pos + f * signal * self.vl**2 * dt
+            tempPos = self.pos + f * signal * abs( self.vl) * dt
 
 
 

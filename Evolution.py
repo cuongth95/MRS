@@ -1,13 +1,12 @@
 from hmac import new
-
-from PyQt5.QtCore import QPointF
-
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
-from gui import MRS
+import sys
+import json,codecs
 from Robot import Robot
 from collections import namedtuple
 import numpy as np
+from pathlib import Path
 '''
 @author Truong Huy Cuong
 '''
@@ -51,17 +50,18 @@ RNN =  namedtuple('RNN',['x','b1','W1','b2','W2'])
 
 class Evolution:
 
-    def __init__(self,gui,startPos,sThreshold):
+    def __init__(self,gui,startPos,sThreshold,filePath):
 
 
         self.gui = gui
         #self.mainRobot = gui.robot
         self.mutationRate = 0.1
         self.startPos = startPos
+        self.filePath = filePath
         self.Initilization(sThreshold)
 
 
-    def Initilization(self,threshold,population=5):
+    def Initilization(self,threshold,population=20):
         self.offset = 10
         self.maxRow = int(self.gui.screenWidth/self.offset)
         self.maxCol =int(self.gui.screenHeight/self.offset)
@@ -76,7 +76,7 @@ class Evolution:
         hiddenNodes = 4
         self.maxRange = threshold
         #4 + (4 * (12 + 4)) + 2 + (2 * 4)#6+(6*(12+6))+2+(2*6)
-        self.gens = np.random.rand(population,4 + (4 * (12 + 4)) + 2 + (2 * 4)) *0.2 #np.random.randint(self.maxRange,size = (population,4+64+2+8)) #
+        self.gens = np.random.rand(population,4 + (4 * (12 + 4)) + 2 + (2 * 4)) *0.1 #np.random.randint(self.maxRange,size = (population,4+64+2+8)) #
         # self.gens = np.concatenate((self.gens, np.zeros([hiddenNodes])))
         self.robots = []
         self.rnns = []
@@ -138,23 +138,18 @@ class Evolution:
 
     speedUpAmount = 1
     timeCounter = 0
-    timeLimit = 15 *speedUpAmount
+    timeLimit = 2 *speedUpAmount
     isCollided = False
 
     def updateLogicForAll(self, dt):
         isExisted = False
         self.numExistRobots = self.population
         for i, robot in enumerate(self.robots):
-            if  self.timeCounter > self.timeLimit :
-                self.curIndex+=1
-                self.numExistRobots = self.population - self.curIndex
-                self.timeCounter = 0
-                self.isCollided =False
-                return
-
-
-
-            #copy from gui.updateLogic
+            if not robot.isActive:
+                self.numExistRobots -=1
+                continue
+            isExisted=True
+            # copy from gui.updateLogic
             if not self.isCollided:
                 # assign to RNNs
                 self.a2s[i], a3 = FeedForward(self.rnns[i])
@@ -166,23 +161,59 @@ class Evolution:
             self.isCollided = False
 
             for wall in self.gui.walls:
-                flag = robot.checkCollisionWithNewPos(tempPos, wall)
+                flag = robot.checkCollisionWithNewPos(tempPos, wall, self.isCollided)
                 if not self.isCollided:
                     self.isCollided = flag
 
             if not self.isCollided:
                 robot.pos = tempPos
+
             else:
-                robot.isActive=False
+                # GOOD FOR SEARCHING NEW AREA, BUT BAD FOR AVOIDING COLLISION
+                # robot.score = robot.score/3
+                #if robot.isActive:  # punishment
+                #    robot.score = robot.score / 2
+                #robot.score -= 0.5
+                robot.isActive = False
+
             if robot.prevPos[0] != robot.pos[0] or robot.prevPos[1] != robot.pos[1]:
+
+                # GOOD FOR SEARCHING NEW AREA, BUT BAD FOR AVOIDING COLLISION
+                '''
+                if robot.isActive:
+                    row = int(robot.pos[0]/self.offset)
+                    col = int(robot.pos[1]/self.offset)
+                    if row>=0 and row <self.maxRow and col >=0 and col < self.maxCol:
+                        if self.checkPoints[row][col] == 1:
+
+                            robot.score += 1
+                            self.checkPoints[row][col] = 0
+                '''
+                row = int(robot.pos[0] / self.offset)
+                col = int(robot.pos[1] / self.offset)
+                if row >= 0 and row < self.maxRow and col >= 0 and col < self.maxCol:
+                    if self.checkPoints[row][col] == 1:
+                        if robot.isActive:
+                            robot.score += 1
+                        # else:
+                        # robot.score -= 1
+                        self.checkPoints[row][col] = 0
+                '''
+                row = int(robot.pos[0] / self.offset)
+                col = int(robot.pos[1] / self.offset)
+                if row >= 0 and row < self.maxRow and col >= 0 and col < self.maxCol:
+                    if self.checkPoints[row][col] == 1:
+                        self.checkPoints[row][col] = 0
+                '''
+
                 robot.updateSensors()
-                robot.sDistances = np.full(len(robot.sensors),robot.sThreshold)
+                robot.sDistances = np.full(len(robot.sensors), robot.sThreshold)  # np.zeros(len(robot.sensors))
                 for wall in self.gui.walls:
                     robot.updateSensorInfo(robot.pos, wall)
                 self.rnns[i] = self.GetRNNParamsByGen(self.gens[i], robot, self.a2s[i])
 
-
-            if  robot.pos[0] < 0 - 50 or robot.pos[0] > self.gui.screenWidth + 50 or robot.pos[1] < 0 - 50 or robot.pos[1] > self.gui.screenHeight + 50:
+            if robot.pos[0] < 0 - 50 or robot.pos[0] > self.gui.screenWidth + 50 or robot.pos[1] < 0 - 50 or robot.pos[
+                1] > self.gui.screenHeight + 50:
                 print("quach thi phung")
 
         if not isExisted: #or self.timeCounter > self.timeLimit:
@@ -197,6 +228,44 @@ class Evolution:
                 for wall in self.gui.walls:
                     deadBoy.updateSensorInfo(deadBoy.pos, wall)
 
+    def updateLogicWithSpecificGenome(self,i,dt):
+        robot = self.robots[i]
+        if not self.isCollided:
+            self.a2, a3 = FeedForward(self.rnns[i])
+            robot.setVelocity(a3[0], a3[1])
+            tempPos = robot.updateTransform(dt)
+        else:
+            tempPos = np.copy(robot.pos)
+
+            # tempPos = np.array([1056.009,500])
+        isCollided = False
+        for wall in self.gui.walls:
+            flag = robot.checkCollisionWithNewPos(tempPos, wall, isCollided)
+            if not isCollided:
+                isCollided = flag
+
+        if not isCollided:
+            robot.pos = tempPos
+            row = int(robot.pos[0] / self.offset)
+            col = int(robot.pos[1] / self.offset)
+            if row >= 0 and row < self.maxRow and col >= 0 and col < self.maxCol:
+                if self.checkPoints[row][col] == 1:
+                    if robot.isActive:
+                        robot.score += 1
+        else:
+            print("ROBOT COLLIDED!!!!")
+            print("robot fitness = "+str(robot.score))
+            sys.exit()
+
+        if robot.prevPos[0] != robot.pos[0] or robot.prevPos[1] != robot.pos[1]:
+            robot.updateSensors()
+            robot.sDistances = np.full(len(robot.sensors),
+                                            robot.sThreshold)  # np.zeros(len(self.robot.sensors))
+            for wall in self.gui.walls:
+                robot.updateSensorInfo(robot.pos, wall)
+            self.rnns[i] = self.GetRNNParamsByGen(self.gens[i], robot, self.a2)
+        print('pos='+str(robot.pos))
+
     def updateLogicPerOne(self, dt):
         if self.curIndex < self.population:
             i = self.curIndex
@@ -204,14 +273,15 @@ class Evolution:
 
             # GOOD FOR SEARCHING NEW AREA, BUT BAD FOR AVOIDING COLLISION
             #if not robot.isActive:# or self.timeCounter > self.timeLimit :
-
-            if robot.score <=0 or self.timeCounter > self.timeLimit :
+            if  self.timeCounter >= self.timeLimit :
+            #if robot.score <=0 or self.timeCounter > self.timeLimit :
                 self.checkPoints = np.ones((self.maxRow, self.maxCol))
                 self.curIndex+=1
                 self.numExistRobots = self.population - self.curIndex
                 self.timeCounter = 0
                 self.isCollided =False
                 self.a2 = None
+                print("robot ("+str(i+1)+"/"+str(self.population)+")-score= "+str(robot.score))
                 return
 
 
@@ -228,7 +298,7 @@ class Evolution:
             self.isCollided = False
 
             for wall in self.gui.walls:
-                flag = robot.checkCollisionWithNewPos(tempPos, wall)
+                flag = robot.checkCollisionWithNewPos(tempPos, wall,self.isCollided)
                 if not self.isCollided:
                     self.isCollided = flag
 
@@ -238,11 +308,13 @@ class Evolution:
             else:
                 # GOOD FOR SEARCHING NEW AREA, BUT BAD FOR AVOIDING COLLISION
                 #robot.score = robot.score/3
-                robot.score -= 2
+                #if robot.isActive: #punishment
+                #   robot.score = robot.score / 2
+                #robot.score -= 0.5
                 robot.isActive=False
 
             if not robot.isActive:
-                self.timeCounter += dt
+                self.timeCounter =   self.timeLimit#+= dt
             #if not robot.isActive:
 
             if robot.prevPos[0] != robot.pos[0] or robot.prevPos[1] != robot.pos[1]:
@@ -262,8 +334,18 @@ class Evolution:
                 col = int(robot.pos[1] / self.offset)
                 if row >= 0 and row < self.maxRow and col >= 0 and col < self.maxCol:
                     if self.checkPoints[row][col] == 1:
+                        if robot.isActive:
+                            robot.score += 1
+                        #else:
+                            #robot.score -= 1
                         self.checkPoints[row][col] = 0
-
+                '''
+                row = int(robot.pos[0] / self.offset)
+                col = int(robot.pos[1] / self.offset)
+                if row >= 0 and row < self.maxRow and col >= 0 and col < self.maxCol:
+                    if self.checkPoints[row][col] == 1:
+                        self.checkPoints[row][col] = 0
+                '''
 
 
                 robot.updateSensors()
@@ -282,6 +364,7 @@ class Evolution:
             self.a2 = None
             self.timeCounter = 0
             self.curIndex = 0
+            self.saveFile()
             self.cycle += 1
             self.numExistRobots = self.population
             self.isCollided = False
@@ -291,12 +374,54 @@ class Evolution:
                 for wall in self.gui.walls:
                     deadBoy.updateSensorInfo(deadBoy.pos, wall)
 
+    def saveFile(self):
+        #print(str(self.gens))
+        acycle= {}
+        acycle['fitness']= self.fitness(self.robots).tolist()
+        acycle['genomes']= self.gens.tolist()
+        p = Path(self.filePath)
+        if p.is_file():
+            obj_text = codecs.open(self.filePath, 'r', encoding='utf-8').read()
+            data = json.loads(obj_text)
+        else:
+            data = {}
+        data[str(self.cycle)]= acycle
+        with codecs.open(self.filePath, 'w', encoding='utf-8') as file:
+            json.dump(data, file, separators=(',', ':'), sort_keys=True, indent=4)
+        ''''
+        with open(self.filePath , 'w') as file:
+            for i in range(self.population):
+                for j in range(len(self.gens[i])):
+                    file.write(str("{:.8f} ".format(float(self.gens[i,j]))))
+                file.write("\n")
+        '''
+
+    def loadFile(self):
+        obj_text = codecs.open(self.filePath, 'r', encoding='utf-8').read()
+        data = json.loads(obj_text)
+        print("loaded - data len ="+str(len(data)))
+        '''
+        genomes = []
+        with open(self.genomesFilePath , 'r') as file:
+            for i in range(20):
+                temp = file.readline()
+                genomes.append(np.fromstring(temp, dtype=float, sep=' '))
+
+        self.gens = np.copy(genomes)
+        for i in range(20):
+            self.rnns[i]= self.GetRNNParamsByGen(self.gens[i], self.robots[i],np.zeros(4))
+        print("done")
+        '''
+
     def updateLogic(self, dt):
         dt = dt * self.speedUpAmount
         # GOOD FOR SEARCHING NEW AREA, BUT BAD FOR AVOIDING COLLISION
         #self.timeCounter +=dt
         #self.updateLogicForAll(dt)
         self.updateLogicPerOne(dt)
+
+    def drawSpecificGenome(self,i,qp):
+        self.robots[i].draw(qp)
 
     def draw(self, qp):
         #for all
@@ -329,12 +454,13 @@ class Evolution:
 
 
     def RunACycle(self,dt):
-        print("cycle = "+str(self.cycle))
+        print("cycle = "+str(self.cycle-1))
         #evaluation
         fitGens = self.fitness(self.robots)
         #selection
         defaultMin = 0
-
+        for i in range(len(fitGens)):
+            print("f["+str(i)+"]="+str(fitGens[i]))
         #get top 3
         maxIndexes = np.zeros(3,dtype=int)
         for i in range(3):
@@ -376,8 +502,8 @@ class Evolution:
             index -= 2
 
         #mutation
-        minGen =  0 + np.random.rand() *(0.002-0)
-        maxGen = minGen + np.random.rand() *(0.5-minGen)
+        minGen = 0.002 #0 + np.random.rand() *(0.002-0)
+        maxGen = 0.15#minGen + np.random.rand() *(0.3-minGen)
         mutationAmount = 0.09
         print("min="+str(minGen)+",max="+str(maxGen))
         for i in range(self.gens.shape[0]):
