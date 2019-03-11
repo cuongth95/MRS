@@ -74,3 +74,14 @@ def normalize(vec):
         vecN[1] = 0
     return vecN
 
+def diversityFunction(g):
+    r = g.ravel()
+    y = []
+    for i in range(0, r.shape[0] - 1):
+        for j in range(i + 1, r.shape[0]):
+            y.append([r[i], r[j]])
+    y = np.array(y)
+
+    d = np.sqrt(y[:,0]**2 + y[:,1]**2)
+    ret = np.sum(d)
+    return ret

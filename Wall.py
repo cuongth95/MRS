@@ -3,7 +3,6 @@ from Object import Object
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 import Utils
-import pygame as pg
 '''
 @author Truong Huy Cuong
 '''

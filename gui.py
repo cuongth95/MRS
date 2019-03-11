@@ -49,11 +49,18 @@ class MRS(QMainWindow):#(QWidget):#
 
         centerX,centerY = self.getCenter()
         #self.wallMid =
-        self.walls.append(Wall(centerX,centerY,300,300))
-        self.walls.append(Wall(centerX-self.screenWidth/2, centerY, 20, self.screenHeight))
-        self.walls.append(Wall(centerX+self.screenWidth/2, centerY, 20, self.screenHeight))
-        self.walls.append(Wall(centerX, centerY-self.screenHeight/2, self.screenWidth, 20))
-        self.walls.append(Wall(centerX, centerY+self.screenHeight/2, self.screenWidth, 20))
+        #self.walls.append(Wall(centerX,centerY,300,300))
+        #tight rectangle -box
+        #self.walls.append(Wall(centerX-self.screenWidth/2+250, centerY, 20, self.screenHeight))
+        #self.walls.append(Wall(centerX+self.screenWidth/2-250, centerY, 20, self.screenHeight))
+        #self.walls.append(Wall(centerX, centerY-self.screenHeight/2+50, self.screenWidth, 20))
+        #self.walls.append(Wall(centerX, centerY+self.screenHeight/2-50, self.screenWidth, 20))
+        #double rectangle
+        self.walls.append(Wall(centerX, centerY, 500, 300))
+        self.walls.append(Wall(centerX - self.screenWidth / 2 , centerY, 20, self.screenHeight))
+        self.walls.append(Wall(centerX + self.screenWidth / 2 , centerY, 20, self.screenHeight))
+        self.walls.append(Wall(centerX, centerY - self.screenHeight / 2 , self.screenWidth, 20))
+        self.walls.append(Wall(centerX, centerY + self.screenHeight / 2 , self.screenWidth, 20))
 
         self.doPress = False
         self.isCollided = False
@@ -65,7 +72,8 @@ class MRS(QMainWindow):#(QWidget):#
         for wall in self.walls:
             self.robot.updateSensorInfo(self.robot.pos, wall)
 
-        self.ea = Evolution.Evolution(self,[540,600],200,self.filePath)
+        #self.ea = Evolution.Evolution(self,[540,360],200,self.filePath)
+        self.ea = Evolution.Evolution(self, [540, 600], 200, self.filePath)
         #self.ea.loadFile()
 
 
@@ -91,7 +99,7 @@ class MRS(QMainWindow):#(QWidget):#
         #self.worker.start()
         self.lastFrameTime = time.time()
 
-        self.timer.start(1000/120,self)
+        self.timer.start(1000.0/60,self)
 
     '''
     def checkCollision(self,r,doResponse=True):
@@ -138,8 +146,8 @@ class MRS(QMainWindow):#(QWidget):#
                 self.robot.updateSensorInfo(self.robot.pos, wall)
         '''
 
-
         if not self.requestSaveFile:
+            #print("Hehe")
             self.ea.updateLogic(dt)
         else:
             self.ea.saveFile()
@@ -150,7 +158,7 @@ class MRS(QMainWindow):#(QWidget):#
             #else:
             #    sys.exit()
 
-        #self.ea.updateLogicWithSpecificGenome(11,dt)
+        #self.ea.updateLogicWithSpecificGenome(8,dt)
         return True
 
 
@@ -240,7 +248,7 @@ class MRS(QMainWindow):#(QWidget):#
         #self.robot.draw(qp)
 
         self.ea.draw(qp)
-        #self.ea.drawSpecificGenome(11,qp)
+        #self.ea.drawSpecificGenome(8,qp)
 
         for wall in self.walls:
             wall.draw(qp)
@@ -300,6 +308,6 @@ if __name__ == '__main__':
     QApplication.processEvents()
 
     app = QApplication([])
-    game = MRS("box_weights1.json")
+    game = MRS("new_fitness_approach.json")
 
     sys.exit(app.exec_())

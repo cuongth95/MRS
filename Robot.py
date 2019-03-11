@@ -21,8 +21,10 @@ class Robot(Object):
         return 2#Object.Shape.CIRCLE
 
     def Reset(self,startPos):
+        self.traces = []
         self.score = 0
         self.maxVeloc = 100
+        self.signVeloc = self.maxVeloc
         self.l = 50
         self.prevPos = np.zeros(2)
         self.epsilon = 0.9
@@ -384,15 +386,31 @@ class Robot(Object):
         return True
 
     def setVelocity(self,vLeft,vRight):
-        if vLeft >= 0 :
-            self.vl = min(vLeft,self.maxVeloc)
+        #print("vl = "+str("{:.2f}".format(vLeft))+", vr="+str("{:.2f}".format(vRight)))
+        if vLeft >= self.signVeloc:
+            #positive area
+            self.vl = vLeft - self.signVeloc
         else:
-            self.vl = max(vLeft,-self.maxVeloc)
+            self.vl = - vLeft
+        if vRight >= self.signVeloc:
+            # positive area
+            self.vr = vRight - self.signVeloc
+        else:
+            self.vr = - vRight
 
-        if vRight >= 0:
-            self.vr = min(vRight, self.maxVeloc)
+
+        if self.vl >= 0 :
+            self.vl = min(self.vl,self.maxVeloc)
         else:
-            self.vrvl = max(vRight, -self.maxVeloc)
+            self.vl = max(self.vl,-self.maxVeloc)
+
+        if self.vr >= 0:
+            self.vr = min(self.vr, self.maxVeloc)
+        else:
+            self.vr = max(self.vr, -self.maxVeloc)
+
+
+        #print("TRUE-vl = "+str("{:.2f}".format(self.vl))+", TRUE-vr="+str("{:.2f}".format(self.vr)))
 
     #box = namedtuple('Box',['x','y','w','h'])
     #Box = namedtuple('Box','x y w h')
@@ -501,6 +519,11 @@ class Robot(Object):
 
 
     def draw(self,qp):
+        #trace
+        pen = QPen(Qt.green, 2, Qt.SolidLine)
+        qp.setPen(pen)
+        for t in self.traces:
+            qp.drawPoint(t[0],t[1])
         #body
         origin = np.array([self.pos[0] - self.rsize[0],self.pos[1] - self.rsize[0]])
         pen = QPen(Qt.red, 1.5, Qt.SolidLine)
@@ -571,8 +594,8 @@ class Robot(Object):
             pen6 = QPen(Qt.darkCyan, 1, Qt.SolidLine)
             qp.setPen(pen6)
             norVec = Utils.normalizeByDivideNorm(sensor - self.pos) *self.sThreshold
-            qp.drawText(QPointF(sensor[0] +norVec[0], sensor[1]+norVec[1]), str("{:.1f}".format(self.sDistances[i])))
-            #qp.drawLine(sensor[0], sensor[1], sensor[0] + norVec[0], sensor[1] + norVec[1])
+            #qp.drawText(QPointF(sensor[0] +norVec[0], sensor[1]+norVec[1]), str("{:.1f}".format(self.sDistances[i])))
+            qp.drawLine(sensor[0], sensor[1], sensor[0] + norVec[0], sensor[1] + norVec[1])
 
 
 
