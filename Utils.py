@@ -82,6 +82,6 @@ def diversityFunction(g):
             y.append([r[i], r[j]])
     y = np.array(y)
 
-    d = np.sqrt(y[:,0]**2 + y[:,1]**2)
+    d =  (y[:,1] - y[:,0])**2
     ret = np.sum(d)
     return ret

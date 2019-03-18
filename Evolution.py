@@ -65,8 +65,9 @@ class Evolution:
         self.Initilization()
 
 
-    def Initilization(self,population=10):
-        self.offset = 30#10
+    def Initilization(self,population=50):
+        self.circum = (self.gui.screenWidth +self.gui.screenHeight)*2
+        self.offset = 10#30#10
         self.maxRow = int(self.gui.screenWidth/self.offset)
         self.maxCol =int(self.gui.screenHeight/self.offset)
         self.checkPoints = np.ones((self.maxRow,self.maxCol))
@@ -85,6 +86,8 @@ class Evolution:
         self.robots = []
         self.rnns = []
         self.a2s = []
+        self.safes = []
+        self.risks = []
 
         #self.prevPoses = []
         for i in range(population):
@@ -98,12 +101,59 @@ class Evolution:
             hid = np.zeros(4)
             tempRNN = self.GetRNNParamsByGen(self.gens[i],temp,hid)
             self.a2s.append(0)
+            self.safes.append(0)
+            self.risks.append(0)
             #self.rnns[i] = self.GetRNNParamsByGen(self.gens[i], temp, a2)
             self.rnns.append(tempRNN)#RNNInit(inp,hid))
             #self.gens.append(np.copy(temp.sDistances))
             #self.prevPoses.append(np.copy(temp.pos))
 
 
+        self.stucks = np.zeros(len(self.robots))
+
+    punishAmount = 1
+    def indiFitness(self,robot,i):
+        temp = 0
+        #if self.risks[i] > 0:
+        #    temp = robot.score * (self.safes[i]/ self.risks[i])
+        #else:
+        #    temp = robot.score
+
+        #temp = robot.score * ( self.risks[i] /self.timeLimit)
+        #if self.risks[i] >0:
+        #    safeRate = self.safes[i] /self.risks[i]
+        #    temp = robot.score * safeRate
+        #else:
+        #    temp = robot.score
+
+
+
+        #safeRate = (1.0- float(self.risks[i] / self.safes[i]))
+
+        #if self.stucks[i] ==0:
+        #temp = ( safeRate +  robot.score/(1080.0/self.offset * 720.0/self.offset))/2
+        #else:
+        #    temp=0
+        #temp =  +(np.sqrt(d[0]**2 + d[1]**2)) / self.circum
+
+        safeRate = (1.0 - float(robot.riskTime) / float(robot.existTime))
+
+        avgScore = robot.score/self.checkPoints.size
+
+        temp = (safeRate + avgScore)/2
+
+        if robot.stuckFlag:
+            temp /= 2
+
+        '''
+        if robot.score > 0:
+            temp = robot.score
+        else:
+            temp = 0
+        if robot.isActive:  # if collides obstacle, flag is False
+            temp *= 2
+        '''
+        return temp
 
     def fitness(self,r):
         f = np.zeros((len(r), 1))
@@ -111,7 +161,10 @@ class Evolution:
 
 
         for i, robot in enumerate(r):
-            f[i] = robot.score
+            #f[i] = robot.score
+            f[i] =  self.indiFitness(robot,i)
+            #f[i] = robot.score * (1-(self.risks[i] / self.timeLimit) )
+
             #if robot.score > 0:
             #    f[i] = robot.score  # self.objectiveDistanceNorm(dist)
             #else:
@@ -146,7 +199,7 @@ class Evolution:
 
     speedUpAmount = 1
     timeCounter = 0
-    timeLimit = 2 *speedUpAmount
+    timeLimit = 10 *speedUpAmount
 
     timeCheckInfinityCounter = 0
     timeCheckInfinityLimit = 20*speedUpAmount
@@ -233,7 +286,8 @@ class Evolution:
             self.timeCounter = 0
             self.cycle += 1
             self.numExistRobots = self.population
-
+            self.safes = np.zeros(len(self.robots))
+            self.risks = np.zeros(len(self.robots))
             self.RunACycle(dt)
             for deadBoy in self.robots:
                 deadBoy.Reset(startPos=self.startPos)
@@ -258,6 +312,7 @@ class Evolution:
 
         if not isCollided:
             robot.pos = tempPos
+            robot.traces.append(np.copy(tempPos))
             row = int(robot.pos[0] / self.offset)
             col = int(robot.pos[1] / self.offset)
             if row >= 0 and row < self.maxRow and col >= 0 and col < self.maxCol:
@@ -266,7 +321,7 @@ class Evolution:
                         robot.score += 1
         else:
             print("ROBOT COLLIDED!!!!")
-            print("robot fitness = "+str(robot.score))
+            print("robot fitness = "+str(self.indiFitness(robot,i)))
             sys.exit()
 
         if robot.prevPos[0] != robot.pos[0] or robot.prevPos[1] != robot.pos[1]:
@@ -282,15 +337,26 @@ class Evolution:
         if self.curIndex < self.population:
             i = self.curIndex
             robot = self.robots[i]
+            for dist in robot.sDistances:
+                if dist != robot.sThreshold:
+                    fraction = dist / robot.sThreshold
+                    if fraction < 0.1: #0.2:
+                        #self.risks[i] += dt
+                        robot.riskTime += dt
+                        break
 
+            robot.existTime += dt
+            #self.safes[i] += dt
             # GOOD FOR SEARCHING NEW AREA, BUT BAD FOR AVOIDING COLLISION
             # if not robot.isActive:# or self.timeCounter > self.timeLimit :
             if self.timeCheckInfinityCounter >= self.timeCheckInfinityLimit or self.timeCounter >= self.timeLimit:
                 # if robot.score <=0 or self.timeCounter > self.timeLimit :
                 if self.timeCheckInfinityCounter >= self.timeCheckInfinityLimit:  # false
-                    print("found minima!!!")
-                    self.saveFile()
+                    print("found (local) optimum!!!")
+                    #self.saveFile()
                     # sys.exit()
+                    self.stucks[i] = self.punishAmount
+                    robot.stuckFlag = True
 
                 self.checkPoints = np.ones((self.maxRow, self.maxCol))
                 self.curIndex += 1
@@ -299,7 +365,8 @@ class Evolution:
                 self.timeCheckInfinityCounter = 0
                 self.isCollided = False
                 self.a2 = None
-                print("robot (" + str(i + 1) + "/" + str(self.population) + ")-score= " + str(robot.score))
+
+                print("robot (" + str(i + 1) + "/" + str(self.population) + ")-fitness= " + str(self.indiFitness(robot,i)))
                 return
 
             # copy from gui.updateLogic
@@ -323,7 +390,10 @@ class Evolution:
                 robot.traces.append(np.copy(tempPos))
             else:
                 robot.isActive = False
+                #self.risks[i] += dt
 
+
+            #self.timeCounter  += dt
             if not robot.isActive:
                 self.timeCounter = self.timeLimit  # += dt
             # if not robot.isActive:
@@ -335,7 +405,7 @@ class Evolution:
                 if row >= 0 and row < self.maxRow and col >= 0 and col < self.maxCol:
                     if self.checkPoints[row][col] == 1:
                         if robot.isActive:
-                            #robot.score += 1
+                            robot.score += 1
 
                             self.timeCheckInfinityCounter = 0
                         # else:
@@ -347,26 +417,14 @@ class Evolution:
                 for wall in self.gui.walls:
                     robot.updateSensorInfo(robot.pos, wall)
 
-                if robot.isActive:
-                    robot.score += 0.1 * (robot.pos[0]- robot.prevPos[0])**2 + (robot.pos[1] -robot.prevPos[1] )**2
 
-                    safeCount = 0
-                    riskCount = 0
-                    for dist in robot.sDistances:
-                        if dist != robot.sThreshold:
-                            fraction = dist/robot.sThreshold
-                            if fraction >= 0.4:
-                                safeCount+=1
-                            else:
-                                riskCount+=1
-                                #robot.score -= fraction * 5
-
-                    robot.score += 0.6*safeCount - 0.4 * riskCount
 
 
                 self.rnns[i] = self.GetRNNParamsByGen(self.gens[i], robot, self.a2)
 
             self.timeCheckInfinityCounter += dt
+
+
 
             if robot.pos[0] < 0 - 50 or robot.pos[0] > self.gui.screenWidth + 50 or robot.pos[1] < 0 - 50 or robot.pos[
                 1] > self.gui.screenHeight + 50:
@@ -381,17 +439,26 @@ class Evolution:
             self.curIndex = 0
             self.saveFile()
             self.cycle += 1
-            if self.cycle > 20:
-                print("Finish 20 cycles")
+            if self.cycle % 21 ==0 :
+                print("Finish 21 cycles")
                 plotData.plotDiversity(self.filePath)
-                sys.exit()
+                #sys.exit()
+
+
+            self.RunACycle(dt)
+
+
             self.numExistRobots = self.population
             self.isCollided = False
-            self.RunACycle(dt)
+            self.safes = np.zeros(len(self.robots))
+            self.risks = np.zeros(len(self.robots))
+
+            self.stucks =np.zeros(len(self.robots))
             for deadBoy in self.robots:
                 deadBoy.Reset(startPos=self.startPos)
                 for wall in self.gui.walls:
                     deadBoy.updateSensorInfo(deadBoy.pos, wall)
+
     def updateLogicPerOne(self, dt):
         if self.curIndex < self.population:
             i = self.curIndex
@@ -547,7 +614,7 @@ class Evolution:
         print("loaded - data len ="+str(len(data)))
 
         self.cycle = len(data)
-        key = str(len(data)-1)
+        key =  str(len(data)-1)
         latestCycle = data[key]
         latestGenomes = latestCycle['genomes']
 
@@ -555,6 +622,8 @@ class Evolution:
         for i in range(len(latestGenomes)):
             self.rnns[i] = self.GetRNNParamsByGen(self.gens[i], self.robots[i], np.zeros(4))
 
+        for robot in self.robots:
+            robot.Reset(self.startPos)
         print("loaded successfully")
         '''
         genomes = []
@@ -582,6 +651,7 @@ class Evolution:
         #self.updateLogicForAll(dt)
         #self.updateLogicPerOne(dt)
         self.updateLogicPerOneWithDistanceFitness(dt)
+
 
     def drawSpecificGenome(self,i,qp):
         self.robots[i].draw(qp)
@@ -621,18 +691,26 @@ class Evolution:
         #evaluation
         fitGens = self.fitness(self.robots)
         #selection
-        defaultMin = 0
-        for i in range(len(fitGens)):
-            print("f["+str(i)+"]="+str(fitGens[i]))
+        #defaultMin = 0
+        #for i in range(len(fitGens)):
+        #    print("f["+str(i)+"]="+str(fitGens[i]))
         #get top 3
-        maxIndexes = np.zeros(3,dtype=int)
-        for i in range(3):
-            maxIndexes[i] = np.argmax(fitGens)
-            if i==0:
-                self.maxFitness = float(fitGens[maxIndexes[i]])
-            fitGens[maxIndexes[i]] = defaultMin
+        #maxIndexes = np.zeros(3,dtype=int)
+        #for i in range(3):
+        #    maxIndexes[i] = np.argmax(fitGens)
+        #    if i==0:
+        #        self.maxFitness = float(fitGens[maxIndexes[i]])
+        #    fitGens[maxIndexes[i]] = defaultMin
+
+
+
+        self.maxFitness = fitGens.max()
 
         print("max fitness = "+str(self.maxFitness ))
+        sortedArgs = [i[0] for i in sorted(enumerate(fitGens), key=lambda x:x[1])]
+        l = len(fitGens)
+
+        maxIndexes = [sortedArgs[l-1],sortedArgs[l-2],sortedArgs[l-3]]
         #reproduction
         newGens = np.copy(self.gens)
 
@@ -665,9 +743,8 @@ class Evolution:
             index -= 2
 
         #mutation
-        minGen = 0#0.002 #0 + np.random.rand() *(0.002-0)
+        minGen = 0.00#0.002 #0 + np.random.rand() *(0.002-0)
         maxGen = 0.25#0.15#0.2#0.15#minGen + np.random.rand() *(0.3-minGen)
-        mutationAmount = 0.09
         print("min="+str(minGen)+",max="+str(maxGen))
         for i in range(self.gens.shape[0]):
             for j in range(self.gens.shape[1]):

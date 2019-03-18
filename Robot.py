@@ -21,17 +21,21 @@ class Robot(Object):
         return 2#Object.Shape.CIRCLE
 
     def Reset(self,startPos):
-        self.traces = []
+        self.existTime = 0
+        self.riskTime =0
+        self.safeTime = 0
         self.score = 0
+        self.stuckFlag = False
         self.maxVeloc = 100
         self.signVeloc = self.maxVeloc
         self.l = 50
-        self.prevPos = np.zeros(2)
+        self.prevPos = np.copy(startPos)
         self.epsilon = 0.9
         self.point = np.array([0, 0])
         self.normal = np.array([0, 0])
         # main properties
         self.pos = np.copy(startPos)
+        self.traces = [np.copy(startPos)]
         self.forward = np.array([1., 0.])
         self.vl = 0.0
         self.vr = 0.0
