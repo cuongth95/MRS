@@ -7,7 +7,9 @@ from PyQt5.QtGui import QPen
 @author Truong Huy Cuong
 '''
 class LRobot:
-    def __init__(self, startPos):
+    def __init__(self, startPos,drawColor = Qt.black,doFill=False):
+        self.drawColor = drawColor
+        self.doFill = doFill
         self.Reset(startPos)
 
     def Reset(self,startPos):
@@ -17,7 +19,7 @@ class LRobot:
         # forward vector
         self.forward = np.array([1, 0])
         # rectangle bounding box
-        self.size = 50.0
+        self.size = 30.0
         self.rsize = np.array([self.size, self.size])
         #sensor configs
         self.sThreshold = 200
@@ -76,11 +78,14 @@ class LRobot:
     def Draw(self, qp):
         #body
         origin = np.array([self.pos[0] - self.rsize[0], self.pos[1] - self.rsize[0]])
-        pen = QPen(Qt.red, 1.5, Qt.SolidLine)
-        qp.setPen(pen)
+        if not self.doFill:
+            pen = QPen(self.drawColor, 1.5, Qt.SolidLine)
+            qp.setPen(pen)
+        else:
+            qp.setBrush(self.drawColor)
         qp.drawEllipse(origin[0], origin[1], self.rsize[0] * 2, self.rsize[0] * 2)
         # forward
-        pen2 = QPen(Qt.red, 0.5, Qt.SolidLine)
+        pen2 = QPen(Qt.red, 2.5, Qt.SolidLine)
         qp.setPen(pen2)
         f = np.copy(self.forward)  # Utils.normalize(self.forward)
         qp.drawLine(self.pos[0], self.pos[1], self.pos[0] + f[0] * self.size, self.pos[1] + f[1] * self.size)
