@@ -3,8 +3,8 @@ import json
 '''
 @author Truong Huy Cuong
 '''
-SCREEN_WIDTH = 1080
-SCREEN_HEIGHT = 720
+SCREEN_WIDTH = 2160
+SCREEN_HEIGHT = 1440
 BLACK = (0,0,0)
 def makeRect(origin, rsize):
     pos = np.array([origin[0], SCREEN_HEIGHT - origin[1]])

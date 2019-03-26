@@ -24,9 +24,19 @@ class Beacon:
         self.size = 10
         self.rsize = np.array([self.size,self.size])
         self.pos = np.copy(startPos)
+        #feature-measurements
+        self.isDetected = False
+
+
+
+
 
     def Draw(self,qp):
         origin = np.array([self.pos[0] - self.rsize[0], self.pos[1] - self.rsize[0]])
-        brush = QBrush(Qt.darkBlue)
+        if not self.isDetected:
+            brush = QBrush(Qt.darkBlue)
+        else:
+            brush = QBrush(Qt.darkGreen)
         qp.setBrush(brush)
         qp.drawEllipse(origin[0], origin[1], self.rsize[0] * 2, self.rsize[0] * 2)
+        qp.drawText(self.pos[0],self.pos[1],str(self.id))
